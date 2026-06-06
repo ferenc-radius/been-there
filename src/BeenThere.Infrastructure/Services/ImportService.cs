@@ -33,54 +33,101 @@ public sealed partial class ImportService(
     {
         var ext = Path.GetExtension(originalFilename).TrimStart('.').ToLowerInvariant();
 
-        var parser = parsers.FirstOrDefault(p => p.CanHandle(ext));
-        if (parser == null)
-        {
+        var fileBytes = await BufferStreamAsync(fileStream, ct);
+
+        if (!TryResolveParser(ext, out var parser))
             return ImportResult.Failure(
                 $"Unsupported file format '.{ext}'. Accepted formats: " +
                 string.Join(", ", parsers.Select(p => p.GetType().Name)));
-        }
 
-        // Buffer into a byte array. MemoryStream is used as a staging area only.
-        // We materialise to byte[] because some parsers (e.g. SharpGPX via XmlReader) dispose
-        // the stream they receive — a byte[] lets us hand each consumer a fresh MemoryStream.
+        if (!TryParse(parser!, fileBytes, originalFilename, out var parsed, out var parseError))
+            return parseError!;
+
+        if (parsed!.Points.Count < 2)
+            return ImportResult.Failure(
+                $"'{originalFilename}' contains fewer than 2 GPS points and cannot be imported.");
+
+        var routeId = Guid.NewGuid();
+
+        var (driveFileId, uploadError) = await UploadAsync(fileBytes, ext, parsed.Name, userId, routeId, originalFilename, ct);
+        if (uploadError != null) return uploadError;
+
+        var persistError = await PersistAsync(parsed, userId, routeId, originalFilename, driveFileId!, ct);
+        if (persistError != null) return persistError;
+
+        duplicateChannel.Enqueue(routeId);
+        LogImportSuccess(logger, routeId, parsed.Name, userId, parsed.Points.Count);
+        return ImportResult.Success(routeId);
+    }
+
+    private bool TryResolveParser(string ext, out IRouteFileParser? parser)
+    {
+        parser = parsers.FirstOrDefault(p => p.CanHandle(ext));
+        return parser != null;
+    }
+
+    private static async Task<byte[]> BufferStreamAsync(Stream source, CancellationToken ct)
+    {
+        // Materialise to byte[] so each consumer (parse, upload) gets a fresh MemoryStream.
+        // Some parsers (e.g. SharpGPX via XmlReader) dispose the stream they receive.
         using var staging = new MemoryStream();
-        await fileStream.CopyToAsync(staging, ct);
-        var fileBytes = staging.ToArray();
+        await source.CopyToAsync(staging, ct);
+        return staging.ToArray();
+    }
 
-        ParsedRoute parsed;
+    private bool TryParse(
+        IRouteFileParser parser,
+        byte[] fileBytes,
+        string originalFilename,
+        out ParsedRoute? parsed,
+        out ImportResult? error)
+    {
         try
         {
-            using var parseStream = new MemoryStream(fileBytes);
-            parsed = parser.Parse(parseStream, originalFilename);
+            using var stream = new MemoryStream(fileBytes);
+            parsed = parser.Parse(stream, originalFilename);
+            error = null;
+            return true;
         }
         catch (Exception ex)
         {
             LogParseWarning(logger, originalFilename, ex);
-            return ImportResult.Failure($"Could not parse '{originalFilename}': {ex.Message}");
+            parsed = null;
+            error = ImportResult.Failure($"Could not parse '{originalFilename}': {ex.Message}");
+            return false;
         }
+    }
 
-        if (parsed.Points.Count < 2)
-        {
-            return ImportResult.Failure(
-                $"'{originalFilename}' contains fewer than 2 GPS points and cannot be imported.");
-        }
-
-        var routeId = Guid.NewGuid();
-        string driveFileId;
+    private async Task<(string? DriveFileId, ImportResult? Error)> UploadAsync(
+        byte[] fileBytes,
+        string ext,
+        string routeName,
+        string userId,
+        Guid routeId,
+        string originalFilename,
+        CancellationToken ct)
+    {
         try
         {
-            using var uploadStream = new MemoryStream(fileBytes);
-            driveFileId = await driveService.UploadFileAsync(
-                userId, routeId, parsed.Name, uploadStream, ext, ct);
+            using var stream = new MemoryStream(fileBytes);
+            var driveFileId = await driveService.UploadFileAsync(userId, routeId, routeName, stream, ext, ct);
+            return (driveFileId, null);
         }
         catch (Exception ex)
         {
             LogDriveError(logger, originalFilename, ex);
-            return ImportResult.Failure(
-                $"Failed to store '{originalFilename}' in Drive. Please try again.");
+            return (null, ImportResult.Failure($"Failed to store '{originalFilename}' in Drive. Please try again."));
         }
+    }
 
+    private async Task<ImportResult?> PersistAsync(
+        ParsedRoute parsed,
+        string userId,
+        Guid routeId,
+        string originalFilename,
+        string driveFileId,
+        CancellationToken ct)
+    {
         var (route, routePoints) = assembler.Assemble(parsed, userId, routeId, originalFilename);
         route.DriveFileId = driveFileId;
 
@@ -89,16 +136,13 @@ public sealed partial class ImportService(
             db.Routes.Add(route);
             db.RoutePoints.AddRange(routePoints);
             await db.SaveChangesAsync(ct);
+            return null;
         }
         catch (Exception ex)
         {
             LogDbError(logger, routeId, ex);
             return ImportResult.Failure("Failed to save route data. Please try again.");
         }
-
-        duplicateChannel.Enqueue(routeId);
-        LogImportSuccess(logger, routeId, parsed.Name, userId, routePoints.Count);
-        return ImportResult.Success(routeId);
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Failed to parse {Filename}")]
