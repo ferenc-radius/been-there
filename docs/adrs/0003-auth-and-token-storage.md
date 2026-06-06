@@ -24,6 +24,28 @@ Google refresh tokens are stored in the standard `AspNetUserTokens` table via `U
 ### Token refresh
 Rely on the **Google client library's built-in auto-refresh** (`UserCredential`). After a library-triggered refresh, persist the new access token back to `AspNetUserTokens` so it survives server restarts.
 
+### Token persistence event hook
+Hook the `OnTokenReceived` event in the Google OAuth handler to persist the refresh token to `AspNetUserTokens`:
+```csharp
+.AddGoogle(o => {
+    o.SaveTokens = true;
+    o.Scope.Add("https://www.googleapis.com/auth/drive.appdata");
+    o.Events = new OpenIdConnectEvents {
+        OnTokenReceived = async context => {
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
+            var user = await userManager.GetUserAsync(context.Principal);
+            if (user != null && context.TokenEndpointResponse?.AccessToken != null) {
+                await userManager.SetAuthenticationTokenAsync(
+                    user, "Google", "access_token", context.TokenEndpointResponse.AccessToken);
+                await userManager.SetAuthenticationTokenAsync(
+                    user, "Google", "refresh_token", context.TokenEndpointResponse.RefreshToken);
+            }
+        }
+    };
+})
+```
+`OnTokenReceived` fires only on sign-in and token refresh (not on every request), minimizing database writes.
+
 ### User data isolation
 Apply **EF Core Global Query Filters** on all user-owned entities (e.g. `Route`) keyed to the current user ID resolved from `IHttpContextAccessor`:
 ```csharp

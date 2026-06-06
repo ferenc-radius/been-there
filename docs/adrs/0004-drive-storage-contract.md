@@ -23,6 +23,38 @@ A failed upload aborts the import with no orphan DB row. A failed DB commit afte
 
 > ⚠️ **Contract safety:** `drive_file_id` is an infrastructure detail. Downloads must be served via `/api/routes/{routeId}/download` — the app resolves the Drive file server-side. Never expose `drive_file_id` in a public DTO.
 
+### DriveService interface design
+The `IDriveService` interface (in `BeenThere.Core`; implemented in `BeenThere.Infrastructure`) exposes three methods for Milestone 2:
+
+```csharp
+public interface IDriveService
+{
+    /// <summary>
+    /// Creates a per-user folder inside appDataFolder if it doesn't exist.
+    /// Idempotent: subsequent calls return the existing folder ID.
+    /// Throws DriveFolderCreationException on failure.
+    /// </summary>
+    Task<string> CreateUserFolderAsync(string userId, CancellationToken ct);
+
+    /// <summary>
+    /// Uploads a file to the user's Drive folder.
+    /// File is named: {routeId}_{sanitised-route-name}.{ext}
+    /// Throws DriveUploadException on failure.
+    /// </summary>
+    Task<string> UploadFileAsync(string userId, Guid routeId, string routeName, 
+        Stream fileStream, string fileExtension, CancellationToken ct);
+
+    /// <summary>
+    /// Downloads a file from Drive by routeId (internal lookup; driveFileId is never exposed).
+    /// Returns a stream; caller is responsible for disposal and setting Content-Disposition headers.
+    /// Throws DriveDownloadException on failure.
+    /// </summary>
+    Task<Stream> DownloadFileAsync(string userId, Guid routeId, CancellationToken ct);
+}
+```
+
+**Error handling:** All methods throw domain exceptions (`DriveFolderCreationException`, `DriveUploadException`, `DriveDownloadException`) that bubble to the Blazor component layer for user-facing error messaging. Never expose Google API error details or stack traces.
+
 ### Caching
 **No local file cache.** All derived data (geometry, stats, elevation) is in Postgres. Raw files are streamed directly from Drive on download. Revisit if download latency becomes noticeable in practice.
 

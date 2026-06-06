@@ -266,3 +266,28 @@ Importing a route that is within 100 m Hausdorff of an existing route results in
 - Manual duplicate merge UI — **deferred post-MVP**
 - TLS termination — handled by nginx reverse proxy or external proxy; out of scope for Milestone 7
 - Garmin Connect / Komoot / Strava import instructions — can be added to ADR-0010 accordion without structural changes
+
+---
+
+## Milestone 2 — Decision Log
+
+**Status:** Decisions locked via Planception interrogation (2026-06-06)
+
+### Resolved Decisions
+
+| ID | Decision | Answer | Evidence |
+|---|---|---|---|
+| Q1 | Token persistence | `AspNetUserTokens` via `UserManager` | ADR-0003 |
+| Q2 | Token refresh | Auto-refresh + persist via `OnTokenReceived` | ADR-0003 (updated) |
+| Q3 | Event hook | `OnTokenReceived` fires on sign-in + refresh | ADR-0003 (updated) |
+| Q4 | DriveService ops | Three methods: CreateFolder, Upload, Download | ADR-0004 (expanded) |
+| Q5 | Error handling | Domain exceptions (e.g. `DriveUploadException`) | ADR-0004 (expanded) |
+| Q6 | File naming | `{routeId}_{sanitised-name}.{ext}` | ADR-0004 |
+| Q7 | Download contract | Stream only; `driveFileId` never exposed | ADR-0004 |
+| Q8 | SignIn/SignOut | Razor components wrapping `/signin`, `/signout` | ADR-0001 (implicit) |
+| Q9 | Secrets injection | `.env` file (local) + env vars (prod) | ADR-0009 |
+| Q10 | Testing | Unit (mocked) + integration (real PostGIS) | ADR-0011 (new) |
+
+### Implementation Blocked By
+None — all decisions are locked and non-blocking.
+
