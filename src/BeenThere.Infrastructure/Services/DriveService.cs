@@ -1,78 +1,61 @@
 using System.Text.RegularExpressions;
 using BeenThere.Core.Exceptions;
 using BeenThere.Core.Interfaces;
+using BeenThere.Infrastructure.Drive;
+using BeenThere.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-
-#pragma warning disable CA1848
 
 namespace BeenThere.Infrastructure.Services;
 
 /// <summary>
-/// Google Drive implementation for storing route files in appDataFolder.
-/// Handles OAuth token management, folder creation, and file operations.
+/// Stores and retrieves route files in the Google Drive appDataFolder for each user.
 /// </summary>
-public class DriveService : IDriveService
+public sealed partial class DriveService : IDriveService
 {
-    private readonly UserManager<IdentityUser> _userManager;
-    private readonly ILogger<DriveService> _logger;
+    private const string AppDataFolder = "appDataFolder";
+    private const string FolderMimeType = "application/vnd.google-apps.folder";
+    private const int MaxSanitisedNameLength = 100;
 
-    // Cache folder IDs per user to avoid repeated folder lookups
     private static readonly Dictionary<string, string> FolderIdCache = new();
-    private static readonly object CacheLock = new();
+    private static readonly object FolderIdCacheLock = new();
+    private static readonly Regex InvalidPathCharsRegex =
+        new($"[{Regex.Escape(new string(Path.GetInvalidFileNameChars()))}]", RegexOptions.Compiled);
+
+    private readonly UserManager<IdentityUser> _userManager;
+    private readonly ApplicationDbContext _db;
+    private readonly IGoogleDriveClientFactory _clientFactory;
+    private readonly ILogger<DriveService> _logger;
 
     public DriveService(
         UserManager<IdentityUser> userManager,
+        ApplicationDbContext db,
+        IGoogleDriveClientFactory clientFactory,
         ILogger<DriveService> logger)
     {
         _userManager = userManager;
+        _db = db;
+        _clientFactory = clientFactory;
         _logger = logger;
     }
 
     public async Task<string> CreateUserFolderAsync(string userId, CancellationToken ct)
     {
-        // Check cache first
-        lock (CacheLock)
+        if (TryGetCachedFolderId(userId, out var cached))
         {
-            if (FolderIdCache.TryGetValue(userId, out var cachedFolderId))
-            {
-                if (_logger.IsEnabled(LogLevel.Information))
-                {
-                    _logger.LogInformation("User folder cache hit for user {UserId}: {FolderId}", userId, cachedFolderId);
-                }
-                return cachedFolderId;
-            }
+            LogFolderCacheHit(_logger, userId, cached!);
+            return cached!;
         }
 
         try
         {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                throw new InvalidOperationException($"User {userId} not found");
-            }
+            var user = await RequireUserAsync(userId);
+            var gdrive = await _clientFactory.CreateAsync(user);
+            var folderId = await FindOrCreateUserFolderAsync(gdrive, userId, ct);
 
-            // Retrieve the refresh token from AspNetUserTokens
-            var refreshToken = await _userManager.GetAuthenticationTokenAsync(user, "Google", "refresh_token");
-            if (string.IsNullOrEmpty(refreshToken))
-            {
-                throw new DriveReauthenticationRequiredException(
-                    "Google Drive access has expired. Please sign out and sign in again.");
-            }
-
-            // For now, we generate a simple folder ID based on user
-            // In production, this would call the actual Google Drive API
-            var folderId = $"drive-folder-{userId}";
-
-            lock (CacheLock)
-            {
-                FolderIdCache[userId] = folderId;
-            }
-
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Created/found user folder for {UserId}: {FolderId}", userId, folderId);
-            }
+            CacheFolderId(userId, folderId);
+            LogFolderResolved(_logger, userId, folderId);
             return folderId;
         }
         catch (DriveReauthenticationRequiredException)
@@ -81,8 +64,9 @@ public class DriveService : IDriveService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to create/lookup user folder for {UserId}", userId);
-            throw new DriveFolderCreationException($"Failed to create or lookup user folder in Drive for user {userId}", ex);
+            LogFolderError(_logger, userId, ex);
+            throw new DriveFolderCreationException(
+                $"Failed to create or lookup user folder in Drive for user {userId}", ex);
         }
     }
 
@@ -96,26 +80,14 @@ public class DriveService : IDriveService
     {
         try
         {
-            var userFolderId = await CreateUserFolderAsync(userId, ct);
+            var folderId = await CreateUserFolderAsync(userId, ct);
+            var user = await RequireUserAsync(userId);
+            var gdrive = await _clientFactory.CreateAsync(user);
+            var fileName = BuildFileName(routeId, routeName, fileExtension);
+            var driveFileId = await UploadToFolderAsync(gdrive, folderId, fileName, fileExtension, fileStream, ct);
 
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                throw new InvalidOperationException($"User {userId} not found");
-            }
-
-            var sanitisedName = SanitiseFileName(routeName);
-            var fileName = $"{routeId}_{sanitisedName}.{fileExtension}";
-
-            // For now, generate a simple file ID based on route ID
-            // In production, this would upload to Google Drive
-            var fileId = $"drive-file-{routeId}";
-
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Uploaded file for user {UserId}, route {RouteId}: {FileId}", userId, routeId, fileId);
-            }
-            return fileId;
+            LogUploadSuccess(_logger, fileName, userId, routeId, driveFileId);
+            return driveFileId;
         }
         catch (DriveReauthenticationRequiredException)
         {
@@ -127,8 +99,9 @@ public class DriveService : IDriveService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to upload file for user {UserId}, route {RouteId}", userId, routeId);
-            throw new DriveUploadException($"Failed to upload file to Drive for route {routeId}", ex);
+            LogUploadError(_logger, userId, routeId, ex);
+            throw new DriveUploadException(
+                $"Failed to upload file to Drive for route {routeId}", ex);
         }
     }
 
@@ -136,24 +109,13 @@ public class DriveService : IDriveService
     {
         try
         {
-            var userFolderId = await CreateUserFolderAsync(userId, ct);
+            var driveFileId = await RequireDriveFileIdAsync(userId, routeId);
+            var user = await RequireUserAsync(userId);
+            var gdrive = await _clientFactory.CreateAsync(user);
+            var stream = await DownloadFromDriveAsync(gdrive, driveFileId, ct);
 
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user == null)
-            {
-                throw new InvalidOperationException($"User {userId} not found");
-            }
-
-            // For now, return an empty stream
-            // In production, this would download from Google Drive
-            var memoryStream = new MemoryStream();
-            memoryStream.Position = 0;
-
-            if (_logger.IsEnabled(LogLevel.Information))
-            {
-                _logger.LogInformation("Downloaded file for user {UserId}, route {RouteId}", userId, routeId);
-            }
-            return memoryStream;
+            LogDownloadSuccess(_logger, driveFileId, userId, routeId);
+            return stream;
         }
         catch (DriveReauthenticationRequiredException)
         {
@@ -165,21 +127,197 @@ public class DriveService : IDriveService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to download file for user {UserId}, route {RouteId}", userId, routeId);
-            throw new DriveDownloadException($"Failed to download file from Drive for route {routeId}", ex);
+            LogDownloadError(_logger, userId, routeId, ex);
+            throw new DriveDownloadException(
+                $"Failed to download file from Drive for route {routeId}", ex);
         }
     }
 
-    private static string SanitiseFileName(string fileName)
-    {
-        // Remove or replace invalid filename characters
-        var invalidChars = Regex.Escape(new string(Path.GetInvalidFileNameChars()));
-        var invalidRegex = new Regex($"[{invalidChars}]", RegexOptions.Compiled);
-        var sanitised = invalidRegex.Replace(fileName, "_");
+    // ── Folder management ───────────────────────────────────────────────────
 
-        // Trim and limit length
-        return sanitised.Trim().Length > 100
-            ? sanitised.Substring(0, 100)
+    private static async Task<string> FindOrCreateUserFolderAsync(
+        Google.Apis.Drive.v3.DriveService gdrive, string userId, CancellationToken ct)
+    {
+        var folderName = $"beenthere_user_{userId}";
+        return await FindFolderAsync(gdrive, folderName, ct)
+               ?? await CreateFolderAsync(gdrive, folderName, ct);
+    }
+
+    private static async Task<string?> FindFolderAsync(
+        Google.Apis.Drive.v3.DriveService gdrive, string folderName, CancellationToken ct)
+    {
+        var request = gdrive.Files.List();
+        request.Spaces = AppDataFolder;
+        request.Q = $"name = '{folderName}' and mimeType = '{FolderMimeType}' and trashed = false";
+        request.Fields = "files(id)";
+        var result = await request.ExecuteAsync(ct);
+        return result.Files?.FirstOrDefault()?.Id;
+    }
+
+    private static async Task<string> CreateFolderAsync(
+        Google.Apis.Drive.v3.DriveService gdrive, string folderName, CancellationToken ct)
+    {
+        var metadata = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = folderName,
+            Parents = [AppDataFolder],
+            MimeType = FolderMimeType
+        };
+        var request = gdrive.Files.Create(metadata);
+        request.Fields = "id";
+        var folder = await request.ExecuteAsync(ct);
+        return folder.Id;
+    }
+
+    // ── File upload ─────────────────────────────────────────────────────────
+
+    private static async Task<string> UploadToFolderAsync(
+        Google.Apis.Drive.v3.DriveService gdrive,
+        string folderId,
+        string fileName,
+        string fileExtension,
+        Stream fileStream,
+        CancellationToken ct)
+    {
+        var metadata = new Google.Apis.Drive.v3.Data.File
+        {
+            Name = fileName,
+            Parents = [folderId]
+        };
+
+        fileStream.Position = 0;
+        var mimeType = ResolveMimeType(fileExtension);
+        var request = gdrive.Files.Create(metadata, fileStream, mimeType);
+        request.Fields = "id";
+
+        var progress = await request.UploadAsync(ct);
+        if (progress.Status == Google.Apis.Upload.UploadStatus.Failed)
+        {
+            throw new DriveUploadException(
+                $"Google Drive upload failed: {progress.Exception?.Message}",
+                progress.Exception!);
+        }
+
+        return request.ResponseBody?.Id
+               ?? throw new DriveUploadException(
+                   "Google Drive upload succeeded but returned no file ID.");
+    }
+
+    // ── File download ───────────────────────────────────────────────────────
+
+    private async Task<string> RequireDriveFileIdAsync(string userId, Guid routeId)
+    {
+        // IgnoreQueryFilters bypasses the global user filter; ownership is
+        // enforced explicitly via the UserId == userId predicate.
+        var driveFileId = await _db.Routes
+            .IgnoreQueryFilters()
+            .Where(r => r.Id == routeId && r.UserId == userId)
+            .Select(r => r.DriveFileId)
+            .FirstOrDefaultAsync();
+
+        if (string.IsNullOrEmpty(driveFileId))
+        {
+            throw new DriveDownloadException($"No Drive file found for route {routeId}.");
+        }
+
+        return driveFileId;
+    }
+
+    private static async Task<Stream> DownloadFromDriveAsync(
+        Google.Apis.Drive.v3.DriveService gdrive, string driveFileId, CancellationToken ct)
+    {
+        var stream = new MemoryStream();
+        var request = gdrive.Files.Get(driveFileId);
+        await request.DownloadAsync(stream, ct);
+        stream.Position = 0;
+        return stream;
+    }
+
+    // ── Folder ID cache ─────────────────────────────────────────────────────
+
+    private static bool TryGetCachedFolderId(string userId, out string? folderId)
+    {
+        lock (FolderIdCacheLock)
+        {
+            return FolderIdCache.TryGetValue(userId, out folderId);
+        }
+    }
+
+    private static void CacheFolderId(string userId, string folderId)
+    {
+        lock (FolderIdCacheLock)
+        {
+            FolderIdCache[userId] = folderId;
+        }
+    }
+
+    // ── User lookup ─────────────────────────────────────────────────────────
+
+    private async Task<IdentityUser> RequireUserAsync(string userId)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user is null)
+        {
+            throw new InvalidOperationException($"User {userId} not found");
+        }
+
+        return user;
+    }
+
+    // ── File naming ─────────────────────────────────────────────────────────
+
+    private static string BuildFileName(Guid routeId, string routeName, string fileExtension)
+    {
+        var sanitised = SanitiseName(routeName);
+        return $"{routeId}_{sanitised}.{fileExtension}";
+    }
+
+    private static string SanitiseName(string name)
+    {
+        var sanitised = InvalidPathCharsRegex.Replace(name, "_").Trim();
+        return sanitised.Length > MaxSanitisedNameLength
+            ? sanitised[..MaxSanitisedNameLength]
             : sanitised;
     }
+
+    private static string ResolveMimeType(string fileExtension) =>
+        fileExtension.ToLowerInvariant() switch
+        {
+            "gpx" => "application/gpx+xml",
+            "kml" => "application/vnd.google-earth.kml+xml",
+            "kmz" => "application/vnd.google-earth.kmz",
+            _ => "application/octet-stream"
+        };
+
+    // ── Structured log messages ─────────────────────────────────────────────
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "User folder cache hit for {UserId}: {FolderId}")]
+    private static partial void LogFolderCacheHit(ILogger logger, string userId, string folderId);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "User folder resolved for {UserId}: {FolderId}")]
+    private static partial void LogFolderResolved(ILogger logger, string userId, string folderId);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "Failed to resolve user folder for {UserId}")]
+    private static partial void LogFolderError(ILogger logger, string userId, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Uploaded {FileName} for user {UserId}, route {RouteId}: {DriveFileId}")]
+    private static partial void LogUploadSuccess(
+        ILogger logger, string fileName, string userId, Guid routeId, string driveFileId);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "Drive upload failed for user {UserId}, route {RouteId}")]
+    private static partial void LogUploadError(ILogger logger, string userId, Guid routeId, Exception ex);
+
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Downloaded Drive file {DriveFileId} for user {UserId}, route {RouteId}")]
+    private static partial void LogDownloadSuccess(
+        ILogger logger, string driveFileId, string userId, Guid routeId);
+
+    [LoggerMessage(Level = LogLevel.Error,
+        Message = "Drive download failed for user {UserId}, route {RouteId}")]
+    private static partial void LogDownloadError(ILogger logger, string userId, Guid routeId, Exception ex);
 }

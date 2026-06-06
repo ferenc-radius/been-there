@@ -1,11 +1,7 @@
 @page "/import"
-@using BeenThere.Core.Domain
 @using BeenThere.Core.Interfaces
-@using BeenThere.Infrastructure.Persistence
-@using Microsoft.EntityFrameworkCore
 @inject IImportService ImportService
 @inject ICurrentUserService CurrentUser
-@inject ApplicationDbContext Db
 
 <PageTitle>BeenThere — Import</PageTitle>
 
@@ -57,10 +53,8 @@
         </ul>
     }
 
-    @* ── Help section — one card per app, hidden once dismissed ── *@
-    @if (!_helpDismissed)
-    {
-        <div class="space-y-3">
+    @* ── Help section ── *@
+    <div class="space-y-3">
             <p class="text-xs font-medium uppercase tracking-wide text-slate-500">How to export from your app</p>
 
             @* AllTrails *@
@@ -116,73 +110,94 @@
                 </div>
             </details>
 
-            @* Garmin Connect — stub *@
-            <details class="rounded-xl border border-surface-border bg-surface-raised/40 text-sm opacity-60 cursor-not-allowed" onclick="return false">
-                <summary class="flex select-none items-center gap-3 px-4 py-3 list-none pointer-events-none">
-                    <span class="flex-1 font-medium text-slate-300">Garmin Connect</span>
+            @* Garmin Connect *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/60 text-sm group">
+                <summary class="flex cursor-pointer select-none items-center gap-3 px-4 py-3 list-none">
+                    <span class="flex-1 font-medium text-slate-200">Garmin Connect</span>
                     <span class="text-xs text-slate-500">iOS · Android · Web</span>
-                    <span class="text-xs rounded-full bg-surface-border px-2 py-0.5 text-slate-500">Coming soon</span>
+                    <Icon Name="chevron-right" Size="14" Class="text-slate-500 group-open:rotate-90 transition-transform" />
                 </summary>
+                <div class="px-4 pb-4 pt-1 space-y-3 text-slate-400 text-xs">
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Web (connect.garmin.com)</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Go to <strong>Activities</strong> and open an activity.</li>
+                            <li>Click the <strong>⚙ gear icon</strong> (top right) → <strong>Export to GPX</strong>.</li>
+                            <li>The file downloads to your computer — upload it above.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Bulk export</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Go to <strong>Account Settings</strong> → <strong>Data Management</strong> → <strong>Export Your Data</strong>.</li>
+                            <li>Click <strong>Export Data</strong> — Garmin sends a ZIP to your email.</li>
+                            <li>Unzip and upload the <code>.gpx</code> files from the <code>Activities/</code> folder above.</li>
+                        </ol>
+                    </div>
+                </div>
             </details>
 
-            @* Komoot — stub *@
-            <details class="rounded-xl border border-surface-border bg-surface-raised/40 text-sm opacity-60 cursor-not-allowed" onclick="return false">
-                <summary class="flex select-none items-center gap-3 px-4 py-3 list-none pointer-events-none">
-                    <span class="flex-1 font-medium text-slate-300">Komoot</span>
+            @* Komoot *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/60 text-sm group">
+                <summary class="flex cursor-pointer select-none items-center gap-3 px-4 py-3 list-none">
+                    <span class="flex-1 font-medium text-slate-200">Komoot</span>
                     <span class="text-xs text-slate-500">iOS · Android · Web</span>
-                    <span class="text-xs rounded-full bg-surface-border px-2 py-0.5 text-slate-500">Coming soon</span>
+                    <Icon Name="chevron-right" Size="14" Class="text-slate-500 group-open:rotate-90 transition-transform" />
                 </summary>
+                <div class="px-4 pb-4 pt-1 space-y-3 text-slate-400 text-xs">
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Web (komoot.com)</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Open a completed tour on <strong>komoot.com</strong>.</li>
+                            <li>Click <strong>⋮ More</strong> → <strong>Download GPX</strong>.</li>
+                            <li>Upload the downloaded file above.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Mobile (iOS / Android)</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Open a completed tour → tap <strong>⋮</strong> → <strong>Export GPX</strong>.</li>
+                            <li>Share to Files / Downloads, then upload above.</li>
+                        </ol>
+                    </div>
+                    <p class="text-slate-500">GPX export requires a free Komoot account. Elevation data and heart rate are included when available.</p>
+                </div>
             </details>
 
-            @* Strava — stub *@
-            <details class="rounded-xl border border-surface-border bg-surface-raised/40 text-sm opacity-60 cursor-not-allowed" onclick="return false">
-                <summary class="flex select-none items-center gap-3 px-4 py-3 list-none pointer-events-none">
-                    <span class="flex-1 font-medium text-slate-300">Strava</span>
+            @* Strava *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/60 text-sm group">
+                <summary class="flex cursor-pointer select-none items-center gap-3 px-4 py-3 list-none">
+                    <span class="flex-1 font-medium text-slate-200">Strava</span>
                     <span class="text-xs text-slate-500">iOS · Android · Web</span>
-                    <span class="text-xs rounded-full bg-surface-border px-2 py-0.5 text-slate-500">Coming soon</span>
+                    <Icon Name="chevron-right" Size="14" Class="text-slate-500 group-open:rotate-90 transition-transform" />
                 </summary>
+                <div class="px-4 pb-4 pt-1 space-y-3 text-slate-400 text-xs">
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Single activity (Web)</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Open an activity on <strong>strava.com</strong>.</li>
+                            <li>Click <strong>⋮</strong> (bottom right of the map) → <strong>Export GPX</strong>.</li>
+                            <li>Upload the downloaded file above.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Bulk export</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Go to <strong>Settings</strong> → <strong>My Account</strong> → <strong>Download or Delete Your Account</strong>.</li>
+                            <li>Click <strong>Request Your Archive</strong> — Strava emails you a download link.</li>
+                            <li>Unzip and upload the <code>.gpx</code> files from the <code>activities/</code> folder above.</li>
+                        </ol>
+                    </div>
+                    <p class="text-amber-400/80">⚠ Strava's bulk export may include <code>.fit.gz</code> or <code>.tcx</code> files in addition to GPX — only upload the <code>.gpx</code> files.</p>
+                </div>
             </details>
 
-            <div class="pt-1 text-right">
-                <button type="button" @onclick="DismissHelpAsync"
-                        class="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2 transition-colors">
-                    Don't show this again
-                </button>
-            </div>
         </div>
-    }
 
 </div>
 
 @code {
-    private bool _helpDismissed;
     private readonly List<FileState> _files = [];
-
-    protected override async Task OnInitializedAsync()
-    {
-        if (CurrentUser.UserId is { } uid)
-        {
-            var prefs = await Db.UserPreferences.FirstOrDefaultAsync(p => p.UserId == uid);
-            _helpDismissed = prefs?.ImportHelpDismissed ?? false;
-        }
-    }
-
-    private async Task DismissHelpAsync()
-    {
-        _helpDismissed = true;
-        if (CurrentUser.UserId is { } uid)
-        {
-            var prefs = await Db.UserPreferences.FirstOrDefaultAsync(p => p.UserId == uid);
-            if (prefs == null)
-            {
-                prefs = new UserPreferences { UserId = uid };
-                Db.UserPreferences.Add(prefs);
-            }
-            prefs.ImportHelpDismissed = true;
-            await Db.SaveChangesAsync();
-        }
-    }
-
     private async Task HandleFilesAsync(InputFileChangeEventArgs e)
     {
         if (CurrentUser.UserId is not { } userId) return;

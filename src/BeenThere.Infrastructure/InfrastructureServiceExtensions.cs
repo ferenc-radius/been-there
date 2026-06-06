@@ -1,4 +1,5 @@
 using BeenThere.Core.Interfaces;
+using BeenThere.Infrastructure.Drive;
 using BeenThere.Infrastructure.Persistence;
 using BeenThere.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -16,6 +17,7 @@ public static class InfrastructureServiceExtensions
         services.AddHttpContextAccessor();
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IGoogleDriveClientFactory, GoogleDriveClientFactory>();
         services.AddScoped<IDriveService, DriveService>();
         services.AddScoped<IRouteFileParser, SharpGpxParser>();
         services.AddScoped<IRouteFileParser, XDocumentKmlParser>();

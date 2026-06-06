@@ -4,10 +4,16 @@
     <PackageReference Include="NetTopologySuite" />
   </ItemGroup>
 
-  <!-- Expose internal members to the Infrastructure layer only (e.g. DriveFileId) -->
+  <!-- Expose internal members (e.g. DriveFileId) to Infrastructure and its test projects -->
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>BeenThere.Infrastructure</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BeenThere.Infrastructure.Tests</_Parameter1>
+    </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>BeenThere.Integration.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
 
