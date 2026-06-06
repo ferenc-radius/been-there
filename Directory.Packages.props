@@ -12,6 +12,8 @@
     <PackageVersion Include="Npgsql.EntityFrameworkCore.PostgreSQL.NetTopologySuite"     Version="10.0.2" />
     <PackageVersion Include="NetTopologySuite"                                            Version="2.6.0" />
 
+    <PackageVersion Include="EFCore.NamingConventions"                                      Version="10.0.1" />
+
     <!-- ASP.NET Core / Auth -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.Google"                         Version="10.0.8" />
     <PackageVersion Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore"               Version="10.0.8" />

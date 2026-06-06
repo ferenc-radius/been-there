@@ -29,8 +29,8 @@ internal sealed class RouteConfiguration : IEntityTypeConfiguration<Route>
                 c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
                 c => c.ToList()));
 
-        // DriveFileId is internal — shadow property, not exposed on the entity publicly
-        builder.Property(r => r.DriveFileId).HasColumnName("drive_file_id").HasMaxLength(256);
+        // DriveFileId is internal — convention auto-maps to drive_file_id
+        builder.Property(r => r.DriveFileId).HasMaxLength(256);
 
         builder.Property(r => r.Geom).HasColumnType("geometry(LineString,4326)");
         builder.Property(r => r.Centroid).HasColumnType("geometry(Point,4326)");

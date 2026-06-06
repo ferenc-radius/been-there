@@ -19,8 +19,9 @@ public static class InfrastructureServiceExtensions
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(
-                configuration.GetConnectionString("Default"),
-                npgsql => npgsql.UseNetTopologySuite()));
+                    configuration.GetConnectionString("Default"),
+                    npgsql => npgsql.UseNetTopologySuite())
+                .UseSnakeCaseNamingConvention());
 
         return services;
     }

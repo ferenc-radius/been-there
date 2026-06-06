@@ -97,6 +97,12 @@ Apply these rules to every file touched. They are non-negotiable for code review
 - Migrations are generated with `dotnet ef migrations add <PascalCaseName>` — name them descriptively (`AddRoutePointIndexes`, not `Update1`).
 - Never call `Database.EnsureCreated()` — use `MigrateAsync()` on startup (ADR-0009).
 
+### Database naming convention
+- **All database identifiers are `snake_case`** — tables, columns, indexes, constraints, sequences.
+- This is enforced globally via `EFCore.NamingConventions` (`UseSnakeCaseNamingConvention()` in `InfrastructureServiceExtensions`). It applies to custom tables **and** ASP.NET Identity tables.
+- Never add `HasColumnName()` or `ToTable()` overrides just to reproduce what the convention already generates. Only add explicit names when the desired DB name genuinely diverges from the convention output (e.g., a legacy column that must keep a non-standard name).
+- Index names are set explicitly via `HasDatabaseName("snake_case_idx")` in entity configurations — do not rely on EF-generated index names.
+
 ### Project-layer rules
 | Layer | May reference | Must NOT reference |
 |-------|--------------|-------------------|
