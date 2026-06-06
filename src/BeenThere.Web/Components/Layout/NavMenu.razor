@@ -1,30 +1,79 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">BeenThere</a>
+﻿@* Vertical navigation rail — icon + label, active state, collapses to icons-only on mobile *@
+
+<nav class="flex flex-col justify-between w-16 md:w-56 shrink-0 bg-surface-raised border-r border-surface-border py-4 transition-all duration-200">
+
+    @* Logo / brand *@
+    <div>
+        <a href="/" class="flex items-center gap-3 px-4 py-3 mb-4 group">
+            <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand/20 text-brand group-hover:bg-brand/30 transition-colors">
+                <Icon Name="mountain" Size="18" />
+            </span>
+            <span class="hidden md:block font-semibold text-sm tracking-wide text-slate-100 truncate">BeenThere</span>
+        </a>
+
+        @* Nav links *@
+        <ul class="space-y-1 px-2">
+            <li>
+                <NavLink href="" Match="NavLinkMatch.All" class="nav-rail-link" ActiveClass="nav-rail-link--active">
+                    <Icon Name="map" Size="20" Class="shrink-0" />
+                    <span class="hidden md:block text-sm font-medium">Map</span>
+                </NavLink>
+            </li>
+            <li>
+                <NavLink href="import" class="nav-rail-link" ActiveClass="nav-rail-link--active">
+                    <Icon Name="upload" Size="20" Class="shrink-0" />
+                    <span class="hidden md:block text-sm font-medium">Import</span>
+                </NavLink>
+            </li>
+            <li>
+                <NavLink href="routes" class="nav-rail-link" ActiveClass="nav-rail-link--active">
+                    <Icon Name="route" Size="20" Class="shrink-0" />
+                    <span class="hidden md:block text-sm font-medium">Routes</span>
+                </NavLink>
+            </li>
+            <li>
+                <NavLink href="analytics" class="nav-rail-link" ActiveClass="nav-rail-link--active">
+                    <Icon Name="bar-chart" Size="20" Class="shrink-0" />
+                    <span class="hidden md:block text-sm font-medium">Analytics</span>
+                </NavLink>
+            </li>
+        </ul>
     </div>
-</div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
-
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span aria-hidden="true">🗺</span> Map
+    @* Bottom actions *@
+    <ul class="space-y-1 px-2">
+        <li>
+            <NavLink href="profile" class="nav-rail-link" ActiveClass="nav-rail-link--active">
+                <Icon Name="user" Size="20" Class="shrink-0" />
+                <span class="hidden md:block text-sm font-medium">Profile</span>
             </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="import">
-                <span aria-hidden="true">📥</span> Import
+        </li>
+        <li>
+            <NavLink href="settings" class="nav-rail-link" ActiveClass="nav-rail-link--active">
+                <Icon Name="settings" Size="20" Class="shrink-0" />
+                <span class="hidden md:block text-sm font-medium">Settings</span>
             </NavLink>
-        </div>
+        </li>
+    </ul>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="profile">
-                <span aria-hidden="true">👤</span> Profile
-            </NavLink>
-        </div>
-    </nav>
-</div>
+</nav>
 
+<style>
+    .nav-rail-link {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.625rem 0.75rem;
+        border-radius: 0.5rem;
+        color: rgb(148 163 184); /* slate-400 */
+        transition: background-color 0.15s, color 0.15s;
+    }
+    .nav-rail-link:hover {
+        background-color: rgb(255 255 255 / 0.06);
+        color: rgb(226 232 240); /* slate-200 */
+    }
+    .nav-rail-link--active {
+        background-color: rgb(99 102 241 / 0.15); /* brand/15 */
+        color: rgb(129 140 248); /* brand-hover */
+    }
+</style>

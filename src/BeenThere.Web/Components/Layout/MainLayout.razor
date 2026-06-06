@@ -1,19 +1,25 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@* App shell: slim icon-rail nav (left) + content area (right) *@
+<div class="flex h-screen w-screen overflow-hidden bg-surface text-slate-100">
 
-    <main>
-        <article class="content px-4">
-            @Body
-        </article>
+    @* ── Left navigation rail ─────────────────────────────────── *@
+    <NavMenu />
+
+    @* ── Content area ─────────────────────────────────────────── *@
+    <main class="flex-1 overflow-auto min-w-0">
+        @Body
     </main>
+
 </div>
 
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
+@* Blazor reconnect / error *@
+<div id="blazor-error-ui"
+     class="fixed bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-3 rounded-xl bg-red-900/90 px-5 py-3 text-sm text-red-100 shadow-xl backdrop-blur ring-1 ring-red-500/40 hidden"
+     data-nosnippet>
+    <span>An unhandled error has occurred.</span>
+    <a href="." class="underline hover:text-white">Reload</a>
+    <button class="ml-auto opacity-60 hover:opacity-100 dismiss">
+        <Icon Name="x" Size="16" />
+    </button>
 </div>
