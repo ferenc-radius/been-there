@@ -41,17 +41,18 @@ public sealed partial class ImportService(
                 string.Join(", ", parsers.Select(p => p.GetType().Name)));
         }
 
-        // Buffer the incoming stream into a MemoryStream.
-        // Required because Blazor's BrowserFileStream is async-only; parsers (SharpGPX, XDocument)
-        // use synchronous StreamReader internally. Buffering also allows rewinding for Drive upload.
-        var buffer = new MemoryStream();
-        await fileStream.CopyToAsync(buffer, ct);
-        buffer.Seek(0, SeekOrigin.Begin);
+        // Buffer into a byte array. MemoryStream is used as a staging area only.
+        // We materialise to byte[] because some parsers (e.g. SharpGPX via XmlReader) dispose
+        // the stream they receive — a byte[] lets us hand each consumer a fresh MemoryStream.
+        using var staging = new MemoryStream();
+        await fileStream.CopyToAsync(staging, ct);
+        var fileBytes = staging.ToArray();
 
         ParsedRoute parsed;
         try
         {
-            parsed = parser.Parse(buffer, originalFilename);
+            using var parseStream = new MemoryStream(fileBytes);
+            parsed = parser.Parse(parseStream, originalFilename);
         }
         catch (Exception ex)
         {
@@ -65,14 +66,13 @@ public sealed partial class ImportService(
                 $"'{originalFilename}' contains fewer than 2 GPS points and cannot be imported.");
         }
 
-        buffer.Seek(0, SeekOrigin.Begin);
-
         var routeId = Guid.NewGuid();
         string driveFileId;
         try
         {
+            using var uploadStream = new MemoryStream(fileBytes);
             driveFileId = await driveService.UploadFileAsync(
-                userId, routeId, parsed.Name, buffer, ext, ct);
+                userId, routeId, parsed.Name, uploadStream, ext, ct);
         }
         catch (Exception ex)
         {
