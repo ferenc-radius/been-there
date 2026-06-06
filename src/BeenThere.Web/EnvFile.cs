@@ -18,10 +18,15 @@ internal static class EnvFile
                 foreach (var line in File.ReadAllLines(candidate))
                 {
                     if (string.IsNullOrWhiteSpace(line) || line.StartsWith('#'))
+                    {
                         continue;
+                    }
+
                     var parts = line.Split('=', 2);
                     if (parts.Length == 2)
+                    {
                         builder.Configuration[parts[0].Trim()] = parts[1].Trim();
+                    }
                 }
                 break;
             }

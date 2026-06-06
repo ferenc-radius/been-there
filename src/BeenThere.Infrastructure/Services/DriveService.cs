@@ -62,12 +62,12 @@ public class DriveService : IDriveService
             // For now, we generate a simple folder ID based on user
             // In production, this would call the actual Google Drive API
             var folderId = $"drive-folder-{userId}";
-            
+
             lock (CacheLock)
             {
                 FolderIdCache[userId] = folderId;
             }
-            
+
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Created/found user folder for {UserId}: {FolderId}", userId, folderId);
@@ -92,7 +92,7 @@ public class DriveService : IDriveService
         try
         {
             var userFolderId = await CreateUserFolderAsync(userId, ct);
-            
+
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
@@ -105,7 +105,7 @@ public class DriveService : IDriveService
             // For now, generate a simple file ID based on route ID
             // In production, this would upload to Google Drive
             var fileId = $"drive-file-{routeId}";
-            
+
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Uploaded file for user {UserId}, route {RouteId}: {FileId}", userId, routeId, fileId);
@@ -128,7 +128,7 @@ public class DriveService : IDriveService
         try
         {
             var userFolderId = await CreateUserFolderAsync(userId, ct);
-            
+
             var user = await _userManager.FindByIdAsync(userId);
             if (user == null)
             {
@@ -139,7 +139,7 @@ public class DriveService : IDriveService
             // In production, this would download from Google Drive
             var memoryStream = new MemoryStream();
             memoryStream.Position = 0;
-            
+
             if (_logger.IsEnabled(LogLevel.Information))
             {
                 _logger.LogInformation("Downloaded file for user {UserId}, route {RouteId}", userId, routeId);
@@ -165,8 +165,8 @@ public class DriveService : IDriveService
         var sanitised = invalidRegex.Replace(fileName, "_");
 
         // Trim and limit length
-        return sanitised.Trim().Length > 100 
-            ? sanitised.Substring(0, 100) 
+        return sanitised.Trim().Length > 100
+            ? sanitised.Substring(0, 100)
             : sanitised;
     }
 }

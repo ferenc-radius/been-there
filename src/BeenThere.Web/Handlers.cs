@@ -32,19 +32,25 @@ internal static class Handlers
     {
         var info = await signInManager.GetExternalLoginInfoAsync();
         if (info == null)
+        {
             return Results.Redirect("/welcome");
+        }
 
         var result = await signInManager.ExternalLoginSignInAsync(
             info.LoginProvider, info.ProviderKey, isPersistent: false);
         if (result.Succeeded)
+        {
             return Results.Redirect("/");
+        }
 
         // First sign-in: create user from Google claims
         var email = info.Principal.FindFirstValue(ClaimTypes.Email) ?? "";
         var user = new IdentityUser { UserName = email, Email = email, EmailConfirmed = true };
         var createResult = await userManager.CreateAsync(user);
         if (!createResult.Succeeded)
+        {
             return Results.Redirect("/welcome");
+        }
 
         await userManager.AddLoginAsync(user, info);
 
@@ -52,7 +58,9 @@ internal static class Handlers
         if (info.AuthenticationTokens != null)
         {
             foreach (var token in info.AuthenticationTokens)
+            {
                 await userManager.SetAuthenticationTokenAsync(user, info.LoginProvider, token.Name, token.Value);
+            }
         }
 
         await signInManager.SignInAsync(user, isPersistent: false);
@@ -95,7 +103,9 @@ internal static class Handlers
     {
         var user = await signInManager.UserManager.GetUserAsync(context.User);
         if (user == null)
+        {
             return Results.Unauthorized();
+        }
 
         try
         {

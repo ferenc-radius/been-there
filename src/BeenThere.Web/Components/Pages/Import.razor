@@ -1,23 +1,228 @@
 @page "/import"
+@using BeenThere.Core.Domain
+@using BeenThere.Core.Interfaces
+@using BeenThere.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject IImportService ImportService
+@inject ICurrentUserService CurrentUser
+@inject ApplicationDbContext Db
 
 <PageTitle>BeenThere — Import</PageTitle>
 
-<div class="max-w-2xl mx-auto px-6 py-10 space-y-6">
+<div class="max-w-2xl mx-auto px-6 py-10 space-y-8">
 
     <div>
         <h1 class="text-xl font-semibold text-slate-100">Import Routes</h1>
-        <p class="text-sm text-slate-400 mt-1">Drag &amp; drop GPX or KML files to add them to your library.</p>
+        <p class="text-sm text-slate-400 mt-1">Upload GPX or KML files exported from your tracking app.</p>
     </div>
 
-    @* Drop zone *@
-    <div class="flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-surface-border bg-surface-raised/50 px-8 py-16 text-center hover:border-brand/60 hover:bg-brand/5 transition-colors cursor-pointer">
-        <span class="flex size-14 items-center justify-center rounded-full bg-brand/10 text-brand">
+    @* ── Drop zone ── always first so the CTA is never buried *@
+    <label class="relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-surface-border bg-surface-raised/50 px-8 py-14 text-center hover:border-brand/60 hover:bg-brand/5 transition-colors cursor-pointer">
+        <InputFile OnChange="HandleFilesAsync" multiple accept=".gpx,.kml"
+                   class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
+        <span class="flex size-14 items-center justify-center rounded-full bg-brand/10 text-brand pointer-events-none">
             <Icon Name="upload" Size="28" />
         </span>
-        <div>
+        <div class="pointer-events-none">
             <p class="text-sm font-medium text-slate-200">Drop GPX / KML files here</p>
-            <p class="text-xs text-slate-500 mt-1">or click to browse — coming in Milestone 3</p>
+            <p class="text-xs text-slate-500 mt-1">or click to browse · up to 50 files at once</p>
         </div>
-    </div>
+    </label>
+
+    @* ── Per-file status list ── *@
+    @if (_files.Count > 0)
+    {
+        <ul class="space-y-2">
+            @foreach (var f in _files)
+            {
+                <li class="flex items-center gap-3 rounded-xl border border-surface-border bg-surface-raised/40 px-4 py-3 text-sm">
+                    <span class="flex-1 truncate text-slate-200">@f.Name</span>
+                    @switch (f.Status)
+                    {
+                        case FileStatus.Pending:
+                            <span class="text-slate-500 text-xs">Queued</span>
+                            break;
+                        case FileStatus.Processing:
+                            <span class="animate-spin size-4 rounded-full border-2 border-brand border-t-transparent shrink-0" aria-label="Uploading" />
+                            break;
+                        case FileStatus.Success:
+                            <Icon Name="check-circle" Size="16" Class="text-green-400 shrink-0" />
+                            break;
+                        case FileStatus.Error:
+                            <span class="text-red-400 text-xs truncate max-w-[14rem]" title="@f.Error">@f.Error</span>
+                            break;
+                    }
+                </li>
+            }
+        </ul>
+    }
+
+    @* ── Help section — one card per app, hidden once dismissed ── *@
+    @if (!_helpDismissed)
+    {
+        <div class="space-y-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-500">How to export from your app</p>
+
+            @* AllTrails *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/60 text-sm group">
+                <summary class="flex cursor-pointer select-none items-center gap-3 px-4 py-3 list-none">
+                    <span class="flex-1 font-medium text-slate-200">AllTrails</span>
+                    <span class="text-xs text-slate-500">iOS · Android · Web</span>
+                    <Icon Name="chevron-right" Size="14" Class="text-slate-500 group-open:rotate-90 transition-transform" />
+                </summary>
+                <div class="px-4 pb-4 pt-1 space-y-3 text-slate-400 text-xs">
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Mobile (iOS / Android)</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Open the app → <strong>Profile</strong> → <strong>Completed</strong> tab.</li>
+                            <li>Tap a recorded activity → <strong>⋮</strong> → <strong>Export</strong> → <strong>GPX</strong>.</li>
+                            <li>Share or save to Files / Downloads, then upload above.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Web (alltrails.com)</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Profile → Completed → click a recording → <strong>Download GPX</strong>.</li>
+                        </ol>
+                    </div>
+                </div>
+            </details>
+
+            @* Locus Map *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/60 text-sm group">
+                <summary class="flex cursor-pointer select-none items-center gap-3 px-4 py-3 list-none">
+                    <span class="flex-1 font-medium text-slate-200">Locus Map 4</span>
+                    <span class="text-xs text-slate-500">Android</span>
+                    <Icon Name="chevron-right" Size="14" Class="text-slate-500 group-open:rotate-90 transition-transform" />
+                </summary>
+                <div class="px-4 pb-4 pt-1 space-y-3 text-slate-400 text-xs">
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Single track</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>Open <strong>My Library</strong> → tap your track.</li>
+                            <li>Tap <strong>⋮</strong> → <strong>Export</strong> → select <strong>GPX</strong> → <strong>EXPORT</strong>.</li>
+                            <li>Save to device storage, then upload above.</li>
+                        </ol>
+                    </div>
+                    <div>
+                        <p class="font-medium text-slate-300 mb-1">Multiple tracks</p>
+                        <ol class="list-decimal list-inside space-y-1">
+                            <li>My Library → folder → topbar menu → <strong>Select</strong>.</li>
+                            <li>Check tracks → bottom-right tool menu → <strong>Export</strong> → <strong>GPX</strong>.</li>
+                        </ol>
+                    </div>
+                    <p class="text-amber-400/80">⚠ Since September 2025 Locus Map no longer exports directly to Google Drive. Export to device storage and transfer manually.</p>
+                    <p class="text-slate-500">Locus Map exports include heart rate, cadence, and power data when your device recorded them.</p>
+                </div>
+            </details>
+
+            @* Garmin Connect — stub *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/40 text-sm opacity-60 cursor-not-allowed" onclick="return false">
+                <summary class="flex select-none items-center gap-3 px-4 py-3 list-none pointer-events-none">
+                    <span class="flex-1 font-medium text-slate-300">Garmin Connect</span>
+                    <span class="text-xs text-slate-500">iOS · Android · Web</span>
+                    <span class="text-xs rounded-full bg-surface-border px-2 py-0.5 text-slate-500">Coming soon</span>
+                </summary>
+            </details>
+
+            @* Komoot — stub *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/40 text-sm opacity-60 cursor-not-allowed" onclick="return false">
+                <summary class="flex select-none items-center gap-3 px-4 py-3 list-none pointer-events-none">
+                    <span class="flex-1 font-medium text-slate-300">Komoot</span>
+                    <span class="text-xs text-slate-500">iOS · Android · Web</span>
+                    <span class="text-xs rounded-full bg-surface-border px-2 py-0.5 text-slate-500">Coming soon</span>
+                </summary>
+            </details>
+
+            @* Strava — stub *@
+            <details class="rounded-xl border border-surface-border bg-surface-raised/40 text-sm opacity-60 cursor-not-allowed" onclick="return false">
+                <summary class="flex select-none items-center gap-3 px-4 py-3 list-none pointer-events-none">
+                    <span class="flex-1 font-medium text-slate-300">Strava</span>
+                    <span class="text-xs text-slate-500">iOS · Android · Web</span>
+                    <span class="text-xs rounded-full bg-surface-border px-2 py-0.5 text-slate-500">Coming soon</span>
+                </summary>
+            </details>
+
+            <div class="pt-1 text-right">
+                <button type="button" @onclick="DismissHelpAsync"
+                        class="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2 transition-colors">
+                    Don't show this again
+                </button>
+            </div>
+        </div>
+    }
 
 </div>
+
+@code {
+    private bool _helpDismissed;
+    private readonly List<FileState> _files = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (CurrentUser.UserId is { } uid)
+        {
+            var prefs = await Db.UserPreferences.FirstOrDefaultAsync(p => p.UserId == uid);
+            _helpDismissed = prefs?.ImportHelpDismissed ?? false;
+        }
+    }
+
+    private async Task DismissHelpAsync()
+    {
+        _helpDismissed = true;
+        if (CurrentUser.UserId is { } uid)
+        {
+            var prefs = await Db.UserPreferences.FirstOrDefaultAsync(p => p.UserId == uid);
+            if (prefs == null)
+            {
+                prefs = new UserPreferences { UserId = uid };
+                Db.UserPreferences.Add(prefs);
+            }
+            prefs.ImportHelpDismissed = true;
+            await Db.SaveChangesAsync();
+        }
+    }
+
+    private async Task HandleFilesAsync(InputFileChangeEventArgs e)
+    {
+        if (CurrentUser.UserId is not { } userId) return;
+
+        var batch = e.GetMultipleFiles(50)
+            .Select(f => new FileState(f))
+            .ToList();
+
+        _files.AddRange(batch);
+        StateHasChanged();
+
+        foreach (var state in batch)
+        {
+            state.Status = FileStatus.Processing;
+            StateHasChanged();
+
+            try
+            {
+                await using var stream = state.File.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                var result = await ImportService.ImportAsync(stream, state.Name, userId);
+                state.Status = result.IsSuccess ? FileStatus.Success : FileStatus.Error;
+                if (!result.IsSuccess) state.Error = result.Error;
+            }
+            catch (Exception ex)
+            {
+                state.Status = FileStatus.Error;
+                state.Error = ex.Message;
+            }
+
+            StateHasChanged();
+        }
+    }
+
+    private enum FileStatus { Pending, Processing, Success, Error }
+
+    private sealed class FileState(IBrowserFile file)
+    {
+        public IBrowserFile File => file;
+        public string Name => file.Name;
+        public FileStatus Status { get; set; } = FileStatus.Pending;
+        public string? Error { get; set; }
+    }
+}

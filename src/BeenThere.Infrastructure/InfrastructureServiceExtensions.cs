@@ -17,6 +17,11 @@ public static class InfrastructureServiceExtensions
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IDriveService, DriveService>();
+        services.AddScoped<IRouteFileParser, SharpGpxParser>();
+        services.AddScoped<IRouteFileParser, XDocumentKmlParser>();
+        services.AddScoped<IRouteAssembler, RouteAssembler>();
+        services.AddScoped<IImportService, ImportService>();
+        services.AddSingleton<IDuplicateDetectionChannel, NullDuplicateDetectionChannel>();
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(

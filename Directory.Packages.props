@@ -25,6 +25,9 @@
     <PackageVersion Include="Google.Apis.Auth"                                           Version="1.75.0" />
     <PackageVersion Include="Google.Apis.Drive.v3"                                       Version="1.74.0.4135" />
 
+    <!-- Parsing -->
+    <PackageVersion Include="BlueToque.SharpGPX"                                         Version="2.25.1230" />
+
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk"                                     Version="17.11.1" />
     <PackageVersion Include="xunit"                                                       Version="2.8.1" />
