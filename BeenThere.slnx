@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BeenThere.Core/BeenThere.Core.csproj" />
+    <Project Path="src/BeenThere.Infrastructure/BeenThere.Infrastructure.csproj" />
+    <Project Path="src/BeenThere.Web/BeenThere.Web.csproj" />
+  </Folder>
+</Solution>
