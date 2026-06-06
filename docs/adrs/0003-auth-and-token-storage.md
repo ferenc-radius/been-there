@@ -10,12 +10,23 @@ Users authenticate via Google OAuth. The app needs to make Drive API calls on be
 ## Decision
 
 ### Identity provider
-Use **ASP.NET Core Identity** with the Google OAuth handler configured as:
+Use **ASP.NET Core Identity** with the Google OAuth handler chained via `AddAuthentication()` (called after `AddIdentity()` so Identity owns the default scheme):
 ```csharp
-.AddGoogle(o => {
-    o.SaveTokens = true;
-    o.Scope.Add("https://www.googleapis.com/auth/drive.appdata");
-})
+// AddIdentity() first — owns DefaultScheme (Identity.Application cookie)
+builder.Services.AddIdentity<IdentityUser, IdentityRole>()
+    .AddEntityFrameworkStores<ApplicationDbContext>();
+
+// Then chain Google without overriding Identity's defaults
+builder.Services.AddAuthentication()
+    .AddGoogle(o => {
+        o.SaveTokens = true;
+        o.Scope.Add("https://www.googleapis.com/auth/drive.appdata");
+    });
+
+// Override Identity's LoginPath (it defaults to /Account/Login)
+builder.Services.ConfigureApplicationCookie(o => {
+    o.LoginPath = "/signin";
+});
 ```
 
 ### Token storage
@@ -25,26 +36,18 @@ Google refresh tokens are stored in the standard `AspNetUserTokens` table via `U
 Rely on the **Google client library's built-in auto-refresh** (`UserCredential`). After a library-triggered refresh, persist the new access token back to `AspNetUserTokens` so it survives server restarts.
 
 ### Token persistence event hook
-Hook the `OnTokenReceived` event in the Google OAuth handler to persist the refresh token to `AspNetUserTokens`:
+Tokens are persisted in the `/signin-complete` endpoint (the OAuth callback completion handler) via `SignInManager.GetExternalLoginInfoAsync()`, which exposes all tokens returned by the Google callback as `ExternalLoginInfo.AuthenticationTokens`:
 ```csharp
-.AddGoogle(o => {
-    o.SaveTokens = true;
-    o.Scope.Add("https://www.googleapis.com/auth/drive.appdata");
-    o.Events = new OpenIdConnectEvents {
-        OnTokenReceived = async context => {
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
-            var user = await userManager.GetUserAsync(context.Principal);
-            if (user != null && context.TokenEndpointResponse?.AccessToken != null) {
-                await userManager.SetAuthenticationTokenAsync(
-                    user, "Google", "access_token", context.TokenEndpointResponse.AccessToken);
-                await userManager.SetAuthenticationTokenAsync(
-                    user, "Google", "refresh_token", context.TokenEndpointResponse.RefreshToken);
-            }
-        }
-    };
-})
+// In /signin-complete endpoint (Program.cs)
+var info = await signInManager.GetExternalLoginInfoAsync();
+if (info?.AuthenticationTokens != null)
+{
+    foreach (var token in info.AuthenticationTokens)
+        await userManager.SetAuthenticationTokenAsync(
+            user, info.LoginProvider, token.Name, token.Value);
+}
 ```
-`OnTokenReceived` fires only on sign-in and token refresh (not on every request), minimizing database writes.
+This fires once per sign-in (not on every request). Token names are `"access_token"`, `"refresh_token"`, and `"token_type"` as returned by Google's token endpoint.
 
 ### User data isolation
 Apply **EF Core Global Query Filters** on all user-owned entities (e.g. `Route`) keyed to the current user ID resolved from `IHttpContextAccessor`:

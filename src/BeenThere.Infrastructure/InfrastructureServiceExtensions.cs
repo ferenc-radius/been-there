@@ -16,6 +16,7 @@ public static class InfrastructureServiceExtensions
         services.AddHttpContextAccessor();
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IDriveService, DriveService>();
 
         services.AddDbContext<ApplicationDbContext>(options =>
             options.UseNpgsql(

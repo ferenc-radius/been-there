@@ -486,3 +486,6 @@ $RECYCLE.BIN/
 
 # Local tool artifacts
 codedb.snapshot
+
+# Local DataProtection keys (dev only)
+**/.dataprotection-keys/

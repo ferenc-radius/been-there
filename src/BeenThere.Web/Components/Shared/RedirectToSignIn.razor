@@ -1,0 +1,60 @@
+@layout SignInLayout
+@attribute [AllowAnonymous]
+
+<div class="text-center space-y-8 px-4 pt-8">
+
+    @* Illustration *@
+    <svg viewBox="0 0 320 160" class="w-64 mx-auto opacity-80" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+        @* Sky gradient *@
+        <defs>
+            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#1e1b4b" />
+                <stop offset="100%" stop-color="#312e81" />
+            </linearGradient>
+            <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#4338ca" />
+                <stop offset="100%" stop-color="#1e1b4b" />
+            </linearGradient>
+        </defs>
+        @* Background *@
+        <rect width="320" height="160" fill="url(#sky)" rx="12" />
+        @* Stars *@
+        <circle cx="30"  cy="20" r="1.2" fill="#a5b4fc" opacity=".8" />
+        <circle cx="80"  cy="12" r="1"   fill="#a5b4fc" opacity=".6" />
+        <circle cx="140" cy="18" r="1.5" fill="#a5b4fc" opacity=".9" />
+        <circle cx="200" cy="10" r="1"   fill="#a5b4fc" opacity=".7" />
+        <circle cx="260" cy="22" r="1.2" fill="#a5b4fc" opacity=".8" />
+        <circle cx="300" cy="14" r="0.9" fill="#a5b4fc" opacity=".6" />
+        <circle cx="55"  cy="35" r="0.8" fill="#a5b4fc" opacity=".5" />
+        <circle cx="175" cy="8"  r="0.8" fill="#a5b4fc" opacity=".5" />
+        @* Far mountain (lighter) *@
+        <polygon points="60,130 140,45 220,130" fill="#4338ca" opacity=".5" />
+        <polygon points="150,130 230,60 300,130" fill="#4338ca" opacity=".4" />
+        @* Main mountain *@
+        <polygon points="0,160 110,50 210,160" fill="url(#hill)" />
+        <polygon points="110,160 220,70 320,160" fill="#312e81" opacity=".9" />
+        @* Snow caps *@
+        <polygon points="110,50 96,80 124,80"  fill="white" opacity=".9" />
+        <polygon points="220,70 208,96 232,96" fill="white" opacity=".75" />
+        @* Trail path *@
+        <path d="M30,155 Q70,140 100,130 Q130,120 150,110 Q170,100 190,95 Q210,90 230,88"
+              fill="none" stroke="#818cf8" stroke-width="2" stroke-dasharray="5,4" stroke-linecap="round" opacity=".9" />
+        @* Trail marker pin *@
+        <circle cx="230" cy="88" r="5" fill="#818cf8" />
+        <circle cx="230" cy="88" r="2.5" fill="white" />
+    </svg>
+
+    <div class="space-y-2">
+        <span class="flex size-16 mx-auto items-center justify-center rounded-2xl bg-brand/20 text-brand">
+            <Icon Name="mountain" Size="32" />
+        </span>
+        <h1 class="text-2xl font-semibold text-slate-100">BeenThere</h1>
+        <p class="text-sm text-slate-400">Been there. Done that. Tracked it.</p>
+    </div>
+
+    <a href="/signin" data-enhance-nav="false"
+       class="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-brand text-white text-sm font-medium hover:bg-brand/90 transition-colors">
+        <Icon Name="log-in" Size="18" />
+        Sign in with Google
+    </a>
+</div>

@@ -45,12 +45,27 @@
                 <span class="hidden md:block text-sm font-medium">Profile</span>
             </NavLink>
         </li>
-        <li>
-            <NavLink href="settings" class="nav-rail-link" ActiveClass="nav-rail-link--active">
-                <Icon Name="settings" Size="20" Class="shrink-0" />
-                <span class="hidden md:block text-sm font-medium">Settings</span>
-            </NavLink>
-        </li>
+        <AuthorizeView>
+            <Authorized>
+                <li>
+                    <form method="post" action="/signout" data-enhance="false">
+                        <AntiforgeryToken />
+                        <button type="submit" class="nav-rail-link w-full text-left">
+                            <Icon Name="log-out" Size="20" Class="shrink-0" />
+                            <span class="hidden md:block text-sm font-medium">Sign Out</span>
+                        </button>
+                    </form>
+                </li>
+            </Authorized>
+            <NotAuthorized>
+                <li>
+                    <a href="/signin" data-enhance-nav="false" class="nav-rail-link">
+                        <Icon Name="log-in" Size="20" Class="shrink-0" />
+                        <span class="hidden md:block text-sm font-medium">Sign In</span>
+                    </a>
+                </li>
+            </NotAuthorized>
+        </AuthorizeView>
     </ul>
 
 </nav>
