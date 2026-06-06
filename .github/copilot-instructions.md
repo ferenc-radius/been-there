@@ -23,6 +23,17 @@ Three-project solution: `BeenThere.Web` → `BeenThere.Core` ← `BeenThere.Infr
 
 Key data flow: drag-and-drop import → SharpGpx/KML parse → Drive upload → Postgres commit (`Route` + `RoutePoint` rows) → background duplicate detection job.
 
+### UI architecture (Tailwind + Lucide)
+
+- **CSS framework:** Tailwind CSS (CDN in dev via `<script src="https://cdn.tailwindcss.com"></script>`; PostCSS build in production).
+- **Dark theme:** `dark` class on `<html>` enforces dark-first colours globally. Token palette in `tailwind.config`: `surface` (bg), `surface-raised` (panels), `surface-overlay` (secondary bg), `surface-border` (dividers), `brand` (accent).
+- **Typography:** Inter font (Google Fonts).
+- **Icon system:** `Icon.razor` component renders **Lucide inline SVGs** by name (e.g., `<Icon Name="map" Size="20" Class="..." />`). Icon paths are hardcoded in the switch statement — never use an external icon library CDN.
+- **Navigation:** Vertical icon+label rail (`w-16` collapsed, `md:w-56` expanded). Collapses to icon-only on mobile (`hidden md:block` on labels).
+- **Map page:** Split-pane layout — route list panel (left 320px) + fullscreen map area (right). Route list includes search bar, route items, and aggregate stats footer.
+- **Components:** Use `.razor.cs` code-behind only for non-trivial logic; prefer single-file components for pure markup.
+- **Separator comments** (e.g. `@* Nav links *@`) are removed for cleanliness. Use HTML/CSS hierarchy and consistent indentation for structure clarity.
+
 ## Contract safety rules
 
 - **Never expose `drive_file_id`** in a public-facing DTO or Blazor binding. Downloads go through `/api/routes/{routeId}/download`.

@@ -2,13 +2,10 @@
 
 <PageTitle>BeenThere — Map</PageTitle>
 
-@* Split-pane: route list panel left, map right *@
 <div class="flex h-full">
 
-    @* ── Route list / filter panel ────────────────────────────── *@
     <aside class="flex flex-col w-80 shrink-0 border-r border-surface-border bg-surface-raised overflow-hidden">
 
-        @* Search bar *@
         <div class="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
             <Icon Name="search" Size="16" Class="text-slate-500" />
             <input type="search"
@@ -19,7 +16,6 @@
             </button>
         </div>
 
-        @* Route list placeholder *@
         <div class="flex-1 overflow-y-auto">
             @for (int i = 0; i < 8; i++)
             {
@@ -35,14 +31,12 @@
             }
         </div>
 
-        @* Stats footer *@
         <div class="px-4 py-3 border-t border-surface-border">
             <p class="text-xs text-slate-500">0 routes · 0 km total</p>
         </div>
 
     </aside>
 
-    @* ── Map area ─────────────────────────────────────────────── *@
     <div class="flex-1 relative bg-surface-overlay">
         <div class="absolute inset-0 flex items-center justify-center text-slate-600">
             <div class="text-center space-y-3">
