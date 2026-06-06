@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/src/BeenThere.Web/BeenThere.Web.csproj",
+        "--no-restore"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "run",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/src/BeenThere.Web/BeenThere.Web.csproj",
+        "--no-build"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    }
+  ]
+}

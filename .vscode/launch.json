@@ -1,0 +1,20 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (web)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build",
+      "program": "${workspaceFolder}/src/BeenThere.Web/bin/Debug/net10.0/BeenThere.Web.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/src/BeenThere.Web",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "{0}",
+        "action": "openExternally"
+      }
+    }
+  ]
+}
