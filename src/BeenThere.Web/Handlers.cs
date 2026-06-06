@@ -18,6 +18,13 @@ internal static class Handlers
     {
         var properties = signInManager.ConfigureExternalAuthenticationProperties(
             GoogleDefaults.AuthenticationScheme, "/signin-complete");
+
+        // Drive API access requires a refresh token. Ask Google for offline access
+        // and explicit consent so a refresh_token is returned and stored.
+        properties.Parameters["access_type"] = "offline";
+        properties.Parameters["prompt"] = "consent";
+        properties.Parameters["include_granted_scopes"] = "true";
+
         return Results.Challenge(properties, [GoogleDefaults.AuthenticationScheme]);
     }
 
@@ -143,6 +150,13 @@ internal static class Handlers
         {
             var fileStream = await driveService.DownloadFileAsync(user.Id, routeId, context.RequestAborted);
             return Results.File(fileStream, "application/octet-stream", $"route-{routeId}.gpx");
+        }
+        catch (DriveReauthenticationRequiredException)
+        {
+            return Results.Problem(
+                title: "Google Drive Re-Authentication Required",
+                detail: "Google Drive access has expired. Please sign out and sign in again.",
+                statusCode: StatusCodes.Status401Unauthorized);
         }
         catch (DriveDownloadException)
         {

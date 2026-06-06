@@ -2,6 +2,7 @@ using BeenThere.Core.Interfaces;
 using BeenThere.Core.Models;
 using BeenThere.Infrastructure.Persistence;
 using Microsoft.Extensions.Logging;
+using BeenThere.Core.Exceptions;
 
 namespace BeenThere.Infrastructure.Services;
 
@@ -124,6 +125,10 @@ public sealed partial class ImportService(
             using var stream = new MemoryStream(fileBytes);
             var driveFileId = await driveService.UploadFileAsync(userId, routeId, routeName, stream, ext, ct);
             return (driveFileId, null);
+        }
+        catch (DriveReauthenticationRequiredException)
+        {
+            return (null, ImportResult.Failure("Google Drive access has expired. Please sign out and sign in again."));
         }
         catch (Exception ex)
         {

@@ -66,7 +66,7 @@ public class Milestone2IntegrationTests
         // Act & Assert
         var ex = await Assert.ThrowsAsync<BeenThere.Core.Exceptions.DriveFolderCreationException>(
             () => driveService.CreateUserFolderAsync(userId, CancellationToken.None));
-        
+
         Assert.Contains("Failed to create or lookup user folder in Drive", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -88,10 +88,10 @@ public class Milestone2IntegrationTests
             .ReturnsAsync((string?)null);
 
         // Act & Assert
-        var ex = await Assert.ThrowsAsync<BeenThere.Core.Exceptions.DriveFolderCreationException>(
+        var ex = await Assert.ThrowsAsync<BeenThere.Core.Exceptions.DriveReauthenticationRequiredException>(
             () => driveService.CreateUserFolderAsync(userId, CancellationToken.None));
-        
-        Assert.Contains("Failed to create or lookup user folder in Drive", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("expired", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

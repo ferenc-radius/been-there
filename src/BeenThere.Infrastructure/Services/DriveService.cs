@@ -56,7 +56,8 @@ public class DriveService : IDriveService
             var refreshToken = await _userManager.GetAuthenticationTokenAsync(user, "Google", "refresh_token");
             if (string.IsNullOrEmpty(refreshToken))
             {
-                throw new InvalidOperationException($"No refresh token found for user {userId}");
+                throw new DriveReauthenticationRequiredException(
+                    "Google Drive access has expired. Please sign out and sign in again.");
             }
 
             // For now, we generate a simple folder ID based on user
@@ -73,6 +74,10 @@ public class DriveService : IDriveService
                 _logger.LogInformation("Created/found user folder for {UserId}: {FolderId}", userId, folderId);
             }
             return folderId;
+        }
+        catch (DriveReauthenticationRequiredException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -112,6 +117,10 @@ public class DriveService : IDriveService
             }
             return fileId;
         }
+        catch (DriveReauthenticationRequiredException)
+        {
+            throw;
+        }
         catch (DriveUploadException)
         {
             throw;
@@ -145,6 +154,10 @@ public class DriveService : IDriveService
                 _logger.LogInformation("Downloaded file for user {UserId}, route {RouteId}", userId, routeId);
             }
             return memoryStream;
+        }
+        catch (DriveReauthenticationRequiredException)
+        {
+            throw;
         }
         catch (DriveDownloadException)
         {
