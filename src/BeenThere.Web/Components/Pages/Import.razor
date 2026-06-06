@@ -187,22 +187,40 @@
     {
         if (CurrentUser.UserId is not { } userId) return;
 
-        var batch = e.GetMultipleFiles(50)
-            .Select(f => new FileState(f))
-            .ToList();
+        var files = e.GetMultipleFiles(50).ToList();
+
+        // Buffer ALL browser file streams into MemoryStreams eagerly before any StateHasChanged()
+        // calls. Blazor's BrowserFileStream is backed by JS interop and can be closed/invalidated
+        // after re-renders — buffering upfront avoids "Cannot access a closed Stream" errors.
+        var batch = new List<FileState>(files.Count);
+        foreach (var file in files)
+        {
+            var state = new FileState(file.Name);
+            batch.Add(state);
+            try
+            {
+                await using var raw = file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                await raw.CopyToAsync(state.Buffer);
+                state.Buffer.Seek(0, SeekOrigin.Begin);
+            }
+            catch (Exception ex)
+            {
+                state.Status = FileStatus.Error;
+                state.Error = $"Could not read file: {ex.Message}";
+            }
+        }
 
         _files.AddRange(batch);
         StateHasChanged();
 
-        foreach (var state in batch)
+        foreach (var state in batch.Where(s => s.Status == FileStatus.Pending))
         {
             state.Status = FileStatus.Processing;
             StateHasChanged();
 
             try
             {
-                await using var stream = state.File.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
-                var result = await ImportService.ImportAsync(stream, state.Name, userId);
+                var result = await ImportService.ImportAsync(state.Buffer, state.Name, userId);
                 state.Status = result.IsSuccess ? FileStatus.Success : FileStatus.Error;
                 if (!result.IsSuccess) state.Error = result.Error;
             }
@@ -218,10 +236,10 @@
 
     private enum FileStatus { Pending, Processing, Success, Error }
 
-    private sealed class FileState(IBrowserFile file)
+    private sealed class FileState(string name)
     {
-        public IBrowserFile File => file;
-        public string Name => file.Name;
+        public string Name => name;
+        public MemoryStream Buffer { get; } = new MemoryStream();
         public FileStatus Status { get; set; } = FileStatus.Pending;
         public string? Error { get; set; }
     }
