@@ -40,6 +40,15 @@ internal static class Handlers
             info.LoginProvider, info.ProviderKey, isPersistent: false);
         if (result.Succeeded)
         {
+            // Returning sign-in: update tokens so DriveService always has a fresh access_token.
+            // Google only returns refresh_token on first-ever consent; preserve any existing one
+            // rather than overwriting with null.
+            var existingUser = await userManager.FindByLoginAsync(info.LoginProvider, info.ProviderKey);
+            if (existingUser != null)
+            {
+                await PersistTokensAsync(userManager, existingUser, info, preserveExistingRefreshToken: true);
+            }
+
             return Results.Redirect("/");
         }
 
@@ -53,18 +62,41 @@ internal static class Handlers
         }
 
         await userManager.AddLoginAsync(user, info);
-
-        // Persist Google OAuth tokens to AspNetUserTokens (ADR-0003)
-        if (info.AuthenticationTokens != null)
-        {
-            foreach (var token in info.AuthenticationTokens)
-            {
-                await userManager.SetAuthenticationTokenAsync(user, info.LoginProvider, token.Name, token.Value);
-            }
-        }
-
+        await PersistTokensAsync(userManager, user, info, preserveExistingRefreshToken: false);
         await signInManager.SignInAsync(user, isPersistent: false);
         return Results.Redirect("/");
+    }
+
+    /// <summary>
+    /// Stores OAuth tokens from <paramref name="info"/> into AspNetUserTokens.
+    /// When <paramref name="preserveExistingRefreshToken"/> is true, an incoming
+    /// null/missing refresh_token does not overwrite an already-stored one
+    /// (Google omits refresh_token on re-auth after first consent).
+    /// </summary>
+    private static async Task PersistTokensAsync(
+        UserManager<IdentityUser> userManager,
+        IdentityUser user,
+        ExternalLoginInfo info,
+        bool preserveExistingRefreshToken)
+    {
+        if (info.AuthenticationTokens == null)
+        {
+            return;
+        }
+
+        foreach (var token in info.AuthenticationTokens)
+        {
+            if (preserveExistingRefreshToken && token.Name == "refresh_token")
+            {
+                // Don't overwrite an existing refresh_token with a missing/empty one
+                var existing = await userManager.GetAuthenticationTokenAsync(user, info.LoginProvider, "refresh_token");
+                if (!string.IsNullOrEmpty(existing) && string.IsNullOrEmpty(token.Value))
+                {
+                    continue;
+                }
+            }
+            await userManager.SetAuthenticationTokenAsync(user, info.LoginProvider, token.Name, token.Value);
+        }
     }
 
     internal static async Task<IResult> SignOut(

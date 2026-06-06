@@ -36,24 +36,36 @@ public sealed partial class ImportService(
         var fileBytes = await BufferStreamAsync(fileStream, ct);
 
         if (!TryResolveParser(ext, out var parser))
+        {
             return ImportResult.Failure(
                 $"Unsupported file format '.{ext}'. Accepted formats: " +
                 string.Join(", ", parsers.Select(p => p.GetType().Name)));
+        }
 
         if (!TryParse(parser!, fileBytes, originalFilename, out var parsed, out var parseError))
+        {
             return parseError!;
+        }
 
         if (parsed!.Points.Count < 2)
+        {
             return ImportResult.Failure(
                 $"'{originalFilename}' contains fewer than 2 GPS points and cannot be imported.");
+        }
 
         var routeId = Guid.NewGuid();
 
         var (driveFileId, uploadError) = await UploadAsync(fileBytes, ext, parsed.Name, userId, routeId, originalFilename, ct);
-        if (uploadError != null) return uploadError;
+        if (uploadError != null)
+        {
+            return uploadError;
+        }
 
         var persistError = await PersistAsync(parsed, userId, routeId, originalFilename, driveFileId!, ct);
-        if (persistError != null) return persistError;
+        if (persistError != null)
+        {
+            return persistError;
+        }
 
         duplicateChannel.Enqueue(routeId);
         LogImportSuccess(logger, routeId, parsed.Name, userId, parsed.Points.Count);
