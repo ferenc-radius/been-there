@@ -1,6 +1,7 @@
 services:
   db:
     image: postgis/postgis:17-3.5
+    platform: linux/amd64   # PostGIS 17-3.5 has no arm64 manifest; runs via Rosetta2 on Apple Silicon
     environment:
       POSTGRES_USER: beenthere
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
