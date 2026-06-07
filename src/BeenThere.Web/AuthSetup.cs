@@ -45,6 +45,11 @@ internal static class AuthSetup
                     ?? throw new InvalidOperationException("GOOGLE_CLIENT_ID not configured");
                 options.ClientSecret = configuration["GOOGLE_CLIENT_SECRET"]
                     ?? throw new InvalidOperationException("GOOGLE_CLIENT_SECRET not configured");
+                // Request all necessary scopes for profile and Drive access
+                options.Scope.Clear();
+                options.Scope.Add("openid");
+                options.Scope.Add("profile");
+                options.Scope.Add("email");
                 options.Scope.Add("https://www.googleapis.com/auth/drive.appdata");
                 options.SaveTokens = true;
                 // Lax + SameAsRequest required so the correlation cookie survives the

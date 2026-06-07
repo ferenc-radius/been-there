@@ -45,4 +45,8 @@ public sealed class Route
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public ICollection<RoutePoint> Points { get; init; } = [];
+
+    public ICollection<RouteRating> Ratings { get; init; } = [];
+
+    public ICollection<RouteReview> Reviews { get; init; } = [];
 }

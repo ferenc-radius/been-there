@@ -1,0 +1,70 @@
+@using BeenThere.Core.Models
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ILogger<SharingToggle> Logger
+
+<div class="flex items-center gap-2 p-2 bg-slate-800 rounded border border-slate-700">
+    <input 
+        type="checkbox" 
+        class="w-4 h-4 rounded cursor-pointer"
+        checked="@IsPublic"
+        disabled="@(IsLoading || IsOwner == false)"
+        @onchange="OnToggleSharing" />
+    <label class="text-sm text-slate-300 cursor-pointer select-none">
+        @if (IsPublic)
+        {
+            <span>✓ Public (others can see this route)</span>
+        }
+        else
+        {
+            <span>○ Private (only you can see this)</span>
+        }
+    </label>
+    @if (IsLoading)
+    {
+        <span class="text-xs text-slate-400">Saving...</span>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid RouteId { get; set; }
+
+    [Parameter]
+    public bool IsPublic { get; set; }
+
+    [Parameter]
+    public bool IsOwner { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<bool> OnPublicChanged { get; set; }
+
+    private bool IsLoading;
+
+    private async Task OnToggleSharing(ChangeEventArgs e)
+    {
+        if (e.Value is bool newValue && newValue != IsPublic)
+        {
+            IsLoading = true;
+            try
+            {
+                // PATCH /api/routes/{routeId}/visibility
+                var response = await Http.PatchAsJsonAsync($"/api/routes/{RouteId}/visibility", new { isPublic = newValue });
+                if (response.IsSuccessStatusCode)
+                {
+                    IsPublic = newValue;
+                    await OnPublicChanged.InvokeAsync(newValue);
+                    Logger.LogInformation("Route {RouteId} visibility changed to {IsPublic}", RouteId, newValue);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to update route visibility");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+    }
+}

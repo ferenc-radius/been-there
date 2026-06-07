@@ -27,7 +27,10 @@ internal sealed class RouteService(ApplicationDbContext db, IGeocodingService ge
         var route = await _db.Routes
             .FirstOrDefaultAsync(r => r.Id == routeId && r.UserId == userId, cancellationToken);
 
-        if (route is null) return false;
+        if (route is null)
+        {
+            return false;
+        }
 
         _db.Routes.Remove(route);
         await _db.SaveChangesAsync(cancellationToken);
@@ -49,6 +52,7 @@ internal sealed class RouteService(ApplicationDbContext db, IGeocodingService ge
                 ElevGainM = r.ElevGainM,
                 Tags = r.Tags,
                 Notes = r.Notes,
+                UserId = r.UserId,
                 Points = r.Points
                     .OrderBy(p => p.Idx)
                     .Select(p => new RoutePointSummaryDto(p.Idx, p.ElevationM, p.RecordedAt))
@@ -64,10 +68,25 @@ internal sealed class RouteService(ApplicationDbContext db, IGeocodingService ge
     {
         var query = _db.Routes.AsNoTracking().Where(r => r.UserId == userId).AsQueryable();
 
-        if (filter.MinLengthM.HasValue) query = query.Where(r => r.DistanceM >= filter.MinLengthM.Value);
-        if (filter.MaxLengthM.HasValue) query = query.Where(r => r.DistanceM <= filter.MaxLengthM.Value);
-        if (filter.StartDate.HasValue) query = query.Where(r => r.Date >= filter.StartDate.Value);
-        if (filter.EndDate.HasValue) query = query.Where(r => r.Date <= filter.EndDate.Value);
+        if (filter.MinLengthM.HasValue)
+        {
+            query = query.Where(r => r.DistanceM >= filter.MinLengthM.Value);
+        }
+
+        if (filter.MaxLengthM.HasValue)
+        {
+            query = query.Where(r => r.DistanceM <= filter.MaxLengthM.Value);
+        }
+
+        if (filter.StartDate.HasValue)
+        {
+            query = query.Where(r => r.Date >= filter.StartDate.Value);
+        }
+
+        if (filter.EndDate.HasValue)
+        {
+            query = query.Where(r => r.Date <= filter.EndDate.Value);
+        }
 
         // Place-based search: geocode place name and apply ST_DWithin filter
         if (!string.IsNullOrWhiteSpace(filter.PlaceName))
@@ -110,7 +129,9 @@ internal sealed class RouteService(ApplicationDbContext db, IGeocodingService ge
         // Tags use a jsonb value converter that EF Core cannot translate to SQL;
         // apply the containment check in memory after the database round-trip.
         if (!string.IsNullOrEmpty(filter.Tag))
+        {
             results = results.Where(r => r.Tags.Contains(filter.Tag)).ToList();
+        }
 
         return results;
     }
@@ -124,7 +145,10 @@ internal sealed class RouteService(ApplicationDbContext db, IGeocodingService ge
         var route = await _db.Routes
             .FirstOrDefaultAsync(r => r.Id == routeId && r.UserId == userId, cancellationToken);
 
-        if (route is null) return false;
+        if (route is null)
+        {
+            return false;
+        }
 
         route.Tags = [.. tags];
         route.UpdatedAt = DateTimeOffset.UtcNow;

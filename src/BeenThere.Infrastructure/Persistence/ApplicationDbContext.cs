@@ -13,6 +13,8 @@ public sealed class ApplicationDbContext(
 {
     public DbSet<Route> Routes => Set<Route>();
     public DbSet<RoutePoint> RoutePoints => Set<RoutePoint>();
+    public DbSet<RouteRating> RouteRatings => Set<RouteRating>();
+    public DbSet<RouteReview> RouteReviews => Set<RouteReview>();
     public DbSet<UserPreferences> UserPreferences => Set<UserPreferences>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -33,14 +35,12 @@ public sealed class ApplicationDbContext(
         builder.Entity<IdentityUserRole<string>>().ToTable("asp_net_user_roles");
         builder.Entity<IdentityRoleClaim<string>>().ToTable("asp_net_role_claims");
 
-        // Global Query Filters — all user-owned queries are automatically scoped (ADR-0003)
-        builder.Entity<Route>()
-            .HasQueryFilter(r => r.UserId == currentUserService.UserId);
-
-        builder.Entity<RoutePoint>()
-            .HasQueryFilter(rp => rp.Route.UserId == currentUserService.UserId);
-
+        // Global Query Filters — (ADR-0003)
+        // UserPreferences: scoped to current user
         builder.Entity<UserPreferences>()
             .HasQueryFilter(up => up.UserId == currentUserService.UserId);
+        
+        // Routes & RoutePoints: visible to all users (no privacy distinction — "I have been there" is about sharing)
+        // Ownership checks happen at the handler level for edit/delete operations
     }
 }

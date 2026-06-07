@@ -1,0 +1,54 @@
+@using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
+@inject IRouteSocialService SocialService
+@inject ILogger<ReviewsList> Logger
+
+<div class="flex flex-col gap-3">
+    @if (Reviews.Count == 0)
+    {
+        <div class="text-sm text-slate-400 italic">No reviews yet. Be the first to review!</div>
+    }
+    else
+    {
+        @foreach (var review in Reviews)
+        {
+            <div class="p-3 bg-slate-700 rounded border border-slate-600">
+                <div class="flex justify-between items-start mb-2">
+                    <div class="text-sm font-semibold text-slate-200">@review.ReviewerName</div>
+                    <div class="text-xs text-slate-400">@review.CreatedAt.ToString("MMM d, yyyy")</div>
+                </div>
+                <p class="text-sm text-slate-300">@review.ReviewText</p>
+            </div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid RouteId { get; set; }
+
+    private List<ReviewDto> Reviews = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadReviews();
+    }
+
+    private async Task LoadReviews()
+    {
+        try
+        {
+            Reviews = await SocialService.GetReviewsForRouteAsync(RouteId, 50);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading reviews");
+        }
+    }
+
+    public async Task RefreshReviews()
+    {
+        await LoadReviews();
+        StateHasChanged();
+    }
+}

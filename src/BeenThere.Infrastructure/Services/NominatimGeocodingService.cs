@@ -71,7 +71,10 @@ public class NominatimGeocodingService(
 
     public async Task<IEnumerable<GeocodeResult>> GeocodeAsync(string query, int maxResults = 7, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(query)) return [];
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return [];
+        }
 
         // Initialize User-Agent on first call
         InitializeUserAgent();
@@ -97,7 +100,11 @@ public class NominatimGeocodingService(
 
                 if (resp.StatusCode == HttpStatusCode.TooManyRequests)
                 {
-                    if (attempt >= maxAttempts) break;
+                    if (attempt >= maxAttempts)
+                    {
+                        break;
+                    }
+
                     var retryAfter = ParseRetryAfter(resp) ?? (int)Math.Pow(2, attempt);
                     RateLimited(logger, retryAfter, null);
                     await Task.Delay(TimeSpan.FromSeconds(retryAfter), ct).ConfigureAwait(false);
@@ -121,7 +128,11 @@ public class NominatimGeocodingService(
             catch (Exception ex)
             {
                 GeocodeAttemptFailed(logger, query, ex);
-                if (attempt >= maxAttempts) break;
+                if (attempt >= maxAttempts)
+                {
+                    break;
+                }
+
                 await Task.Delay(TimeSpan.FromSeconds(Math.Pow(2, attempt)), ct).ConfigureAwait(false);
             }
         }
@@ -150,7 +161,9 @@ public class NominatimGeocodingService(
             var lon = el.GetProperty("lon").GetString();
 
             if (!double.TryParse(lat, nf, nc, out var latd) || !double.TryParse(lon, nf, nc, out var lond))
+            {
                 return null;
+            }
 
             var name = el.TryGetProperty("display_name", out var dn) ? dn.GetString() : null;
 
@@ -159,7 +172,7 @@ public class NominatimGeocodingService(
                 : null;
 
             double[]? bbox = el.TryGetProperty("boundingbox", out var bb) && bb.ValueKind == JsonValueKind.Array
-                ? [..bb.EnumerateArray().Select(ParseBboxValue).OfType<double>()]
+                ? [.. bb.EnumerateArray().Select(ParseBboxValue).OfType<double>()]
                 : null;
 
             return new() { Lat = latd, Lng = lond, DisplayName = name, Importance = importance, BoundingBox = bbox };

@@ -11,4 +11,5 @@ public sealed class RouteDetailDto
     public List<string> Tags { get; init; } = [];
     public string? Notes { get; init; }
     public IReadOnlyList<RoutePointSummaryDto> Points { get; init; } = [];
+    public string UserId { get; init; } = string.Empty;
 }

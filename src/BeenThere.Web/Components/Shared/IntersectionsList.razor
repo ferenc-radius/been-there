@@ -1,0 +1,113 @@
+@using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
+@inject IRouteSocialService SocialService
+@inject ILogger<IntersectionsList> Logger
+
+<div class="rounded-xl border-2 border-brand/40 bg-gradient-to-br from-brand/10 via-surface-overlay to-surface-overlay p-5 space-y-4">
+    <div class="flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+            <div class="flex items-center justify-center w-10 h-10 rounded-full bg-brand/20 border border-brand/40">
+                <Icon Name="users" Size="20" Class="text-brand" />
+            </div>
+            <div>
+                <h3 class="text-base font-bold text-slate-100">Been here too</h3>
+                <p class="text-xs text-slate-400">
+                    @if (IsLoading && IntersectionCount == 0)
+                    {
+                        <span>Looking for overlaps…</span>
+                    }
+                    else if (IntersectionCount == 0)
+                    {
+                        <span>No one else has overlapped this route yet</span>
+                    }
+                    else
+                    {
+                        <span><span class="text-brand font-semibold">@IntersectionCount</span> @(IntersectionCount == 1 ? "person has" : "people have") walked part of this route</span>
+                    }
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @if (IsLoading && Intersections.Count == 0)
+    {
+        <div class="flex items-center justify-center py-6 text-sm text-slate-400">
+            <span class="inline-block animate-pulse">Searching for overlapping routes…</span>
+        </div>
+    }
+    else if (Intersections.Count > 0)
+    {
+        <div class="grid gap-2.5">
+            @foreach (var intersection in Intersections.Take(IsExpanded ? Intersections.Count : 3))
+            {
+                <div class="flex items-center gap-3 p-3 bg-surface-raised rounded-lg border border-surface-border hover:border-brand/40 transition-colors">
+                    <div class="flex items-center justify-center w-9 h-9 rounded-full bg-brand/15 text-brand font-semibold text-sm shrink-0">
+                        @GetInitials(intersection.OtherUserName)
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-semibold text-slate-100 truncate">@intersection.OtherUserName</div>
+                        <div class="text-xs text-slate-400 truncate">@intersection.RouteName</div>
+                    </div>
+                    <div class="shrink-0 text-right">
+                        <div class="text-base font-bold text-brand leading-tight">@intersection.OverlapPercentage.ToString("F0")%</div>
+                        <div class="text-[10px] uppercase tracking-wider text-slate-500">overlap</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @if (Intersections.Count > 3)
+        {
+            <button
+                type="button"
+                class="w-full text-xs text-brand hover:text-brand/80 font-medium py-1.5 transition-colors"
+                @onclick="@(() => IsExpanded = !IsExpanded)">
+                @(IsExpanded ? "Show less" : $"Show {Intersections.Count - 3} more")
+            </button>
+        }
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid RouteId { get; set; }
+
+    private List<IntersectionDto> Intersections = new();
+    private int IntersectionCount;
+    private bool IsExpanded;
+    private bool IsLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Load intersections eagerly — this is the killer feature of the app
+        await LoadIntersections();
+        StateHasChanged();
+    }
+
+    private async Task LoadIntersections()
+    {
+        IsLoading = true;
+        try
+        {
+            Intersections = await SocialService.GetIntersectionsAsync(RouteId);
+            IntersectionCount = Intersections.Count;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading intersections");
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    private static string GetInitials(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "?";
+        var parts = name.Split(new[] { ' ', '@', '.', '_', '-' }, StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return "?";
+        if (parts.Length == 1) return parts[0][..Math.Min(2, parts[0].Length)].ToUpperInvariant();
+        return $"{parts[0][0]}{parts[1][0]}".ToUpperInvariant();
+    }
+}

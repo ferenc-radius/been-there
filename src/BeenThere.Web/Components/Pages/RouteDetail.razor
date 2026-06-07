@@ -3,8 +3,10 @@
 @using BeenThere.Core.Interfaces
 @using BeenThere.Core.Models
 @inject IRouteService RouteService
+@inject IRouteSocialService SocialService
 @inject ICurrentUserService CurrentUserService
 @inject NavigationManager Navigation
+@inject ILogger<RouteDetail> Logger
 
 <div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
@@ -108,6 +110,26 @@
                 </svg>
             }
         </div>
+
+        <!-- Ratings & Reviews (Milestone 6) -->
+        @if (route != null)
+        {
+            <div class="rounded-xl border border-surface-border bg-surface-raised p-6 space-y-5">
+                <RatingForm RouteId="@route.Id" CurrentUserRating="@currentUserRating" AverageRating="@averageRating" RatingCount="@ratingCount" OnRatingSubmitted="OnRatingSubmitted" />
+                
+                <div class="border-t border-surface-border pt-5">
+                    <ReviewForm RouteId="@route.Id" OnReviewSubmitted="OnReviewSubmitted" />
+                </div>
+
+                <div class="border-t border-surface-border pt-5">
+                    <ReviewsList RouteId="@route.Id" @ref="reviewsListComponent" />
+                </div>
+
+                <div class="border-t border-surface-border pt-5">
+                    <IntersectionsList RouteId="@route.Id" />
+                </div>
+            </div>
+        }
     }
 </div>
 
@@ -120,6 +142,13 @@
     private string pendingTag = string.Empty;
     private bool tagSaveError;
 
+    // Milestone 6: Social features
+    private bool isOwner;
+    private int? currentUserRating;
+    private double averageRating = 0;
+    private int ratingCount = 0;
+    private ReviewsList? reviewsListComponent;
+
     private bool HasElevationData => route?.Points.Any(p => p.ElevationM.HasValue) ?? false;
 
     protected override async Task OnInitializedAsync()
@@ -129,6 +158,27 @@
 
         route = await RouteService.GetRouteDetailAsync(userId, routeId);
         editableTags = route?.Tags.ToList() ?? [];
+
+        // Milestone 6: Check ownership and initialize social UI state
+        isOwner = route?.UserId == userId;
+
+        // Load ratings data
+        await LoadRatingsAsync();
+    }
+
+    private async Task LoadRatingsAsync()
+    {
+        try
+        {
+            var ratings = await SocialService.GetRatingsForRouteAsync(routeId);
+            averageRating = ratings.AverageRating;
+            ratingCount = ratings.RatingCount;
+            currentUserRating = ratings.CurrentUserRating;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load ratings");
+        }
     }
 
     private async Task RemoveTag(string tag)
@@ -204,6 +254,22 @@
                 points.Add($"{x:F2},{y:F2}");
             }
             return string.Join(' ', points);
+        }
+    }
+
+    // Milestone 6: Event handlers for social features
+    private void OnRatingSubmitted(int rating)
+    {
+        currentUserRating = rating;
+        // Rating form updates averageRating and ratingCount directly
+    }
+
+    private async Task OnReviewSubmitted(ReviewDto review)
+    {
+        // Refresh reviews list after new review is posted
+        if (reviewsListComponent != null)
+        {
+            await reviewsListComponent.RefreshReviews();
         }
     }
 }

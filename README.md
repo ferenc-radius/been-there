@@ -50,7 +50,11 @@ cp .env.example .env
    - Search for **Google Drive API**
    - Click on it and press **Enable**
 
-3. **Create OAuth 2.0 Credentials**
+3. **Configure OAuth Consent Screen (Optional but Recommended)**
+   - Go to [Google Cloud Console Auth Audience](https://console.cloud.google.com/auth/audience?project=been-there-498619&supportedpurview=project)
+   - Configure your OAuth consent screen settings if needed
+
+4. **Create OAuth 2.0 Credentials**
    - Go to **APIs & Services** → **Credentials**
    - Click **+ Create Credentials** → **OAuth 2.0 Client ID**
    - Select application type: **Web application**

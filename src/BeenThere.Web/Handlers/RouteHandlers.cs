@@ -128,4 +128,9 @@ internal static class RouteHandlers
         var deleted = await routeService.DeleteRouteAsync(userId, routeId, context.RequestAborted);
         return deleted ? Results.Ok() : Results.NotFound();
     }
+
+    internal sealed class VisibilityUpdateDto
+    {
+        public bool IsPublic { get; set; }
+    }
 }

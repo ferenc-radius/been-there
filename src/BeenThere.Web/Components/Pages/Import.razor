@@ -322,7 +322,10 @@
             {
                 var result = await ImportService.ImportAsync(state.Buffer, state.Name, userId);
                 state.Status = result.IsSuccess ? FileStatus.Success : FileStatus.Error;
-                if (!result.IsSuccess) state.Error = result.Error;
+                if (!result.IsSuccess)
+                {
+                    state.Error = result.Error;
+                }
             }
             catch (Exception ex)
             {

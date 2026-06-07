@@ -1,0 +1,97 @@
+@using System.Net.Http.Json
+@inject HttpClient Http
+@inject ILogger<PostImportSharingModal> Logger
+
+@if (IsVisible)
+{
+    <div class="fixed inset-0 z-[9998] bg-black/50 flex items-center justify-center">
+        <div class="bg-slate-900 rounded-lg border border-slate-700 p-6 max-w-sm w-full mx-4">
+            <h3 class="text-lg font-semibold text-slate-100 mb-3">Share this route?</h3>
+            
+            <p class="text-sm text-slate-300 mb-6">
+                Make this route visible to other users so they can see, rate, and review it.
+            </p>
+
+            <p class="text-xs text-slate-400 mb-6">
+                You can change this anytime in the route details.
+            </p>
+
+            <div class="flex gap-3">
+                <button
+                    type="button"
+                    class="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-100 font-medium rounded transition-colors"
+                    disabled="@IsSubmitting"
+                    @onclick="OnNo">
+                    Keep Private
+                </button>
+                <button
+                    type="button"
+                    class="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded transition-colors disabled:opacity-50"
+                    disabled="@IsSubmitting"
+                    @onclick="OnYes">
+                    @if (IsSubmitting)
+                    {
+                        <span>Sharing...</span>
+                    }
+                    else
+                    {
+                        <span>Share Now</span>
+                    }
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid RouteId { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnDismiss { get; set; }
+
+    public bool IsVisible { get; set; }
+    private bool IsSubmitting;
+
+    public void Show(Guid routeId)
+    {
+        RouteId = routeId;
+        IsVisible = true;
+        StateHasChanged();
+    }
+
+    public void Show()
+    {
+        IsVisible = true;
+        StateHasChanged();
+    }
+
+    private async Task OnYes()
+    {
+        IsSubmitting = true;
+        try
+        {
+            var response = await Http.PatchAsJsonAsync($"/api/routes/{RouteId}/visibility", new { isPublic = true });
+            if (response.IsSuccessStatusCode)
+            {
+                Logger.LogInformation("Route {RouteId} shared", RouteId);
+                IsVisible = false;
+                await OnDismiss.InvokeAsync(true);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sharing route");
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task OnNo()
+    {
+        IsVisible = false;
+        await OnDismiss.InvokeAsync(false);
+    }
+}

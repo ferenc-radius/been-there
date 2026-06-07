@@ -3,6 +3,7 @@
 @using BeenThere.Web.Components
 @using BeenThere.Core.Interfaces
 @using BeenThere.Core.Models
+@inject IRouteSocialService SocialService
 
 <PageTitle>BeenThere — Route Library</PageTitle>
 
@@ -122,9 +123,22 @@
                     @foreach (var route in FilteredRoutes)
                     {
                         var isExpanded = expandedId == route.Id;
+                        var sharedCount = intersectionCounts.GetValueOrDefault(route.Id);
                         <tr class="group border-t border-surface-border hover:bg-surface-overlay transition-colors cursor-pointer select-none"
                             @onclick="() => ToggleRow(route.Id)">
-                            <td class="px-5 py-3.5 font-medium text-slate-100">@route.Name</td>
+                            <td class="px-5 py-3.5 font-medium text-slate-100">
+                                <div class="flex items-center gap-2">
+                                    <span>@route.Name</span>
+                                    @if (sharedCount > 0)
+                                    {
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-brand/15 border border-brand/30 px-2 py-0.5 text-[10px] font-semibold text-brand"
+                                              title="@sharedCount other @(sharedCount == 1 ? "person has" : "people have") been here">
+                                            <Icon Name="users" Size="11" />
+                                            @sharedCount
+                                        </span>
+                                    }
+                                </div>
+                            </td>
                             <td class="px-4 py-3.5 text-slate-400 whitespace-nowrap">@route.Date.ToString("MMM d, yyyy")</td>
                             <td class="px-4 py-3.5 text-slate-400 hidden sm:table-cell">@(route.Mode ?? "—")</td>
                             <td class="px-4 py-3.5 text-right text-slate-400 whitespace-nowrap">@((route.DistanceM / 1000d).ToString("F1")) km</td>
@@ -252,6 +266,18 @@
                                             {
                                                 <p class="text-xs text-slate-600 italic">No elevation data in this track.</p>
                                             }
+
+                                            <!-- Social features (Milestone 6) -->
+                                            <div class="border-t border-surface-border pt-5 mt-5 space-y-5">
+                                                <!-- Hero: Been here too (the killer feature) -->
+                                                <IntersectionsList RouteId="@expandedDetail.Id" />
+
+                                                <RatingForm RouteId="@expandedDetail.Id" CurrentUserRating="@currentUserRating" AverageRating="@averageRating" RatingCount="@ratingCount" OnRatingSubmitted="OnRatingSubmitted" />
+
+                                                <ReviewForm RouteId="@expandedDetail.Id" OnReviewSubmitted="OnReviewSubmitted" />
+
+                                                <ReviewsList RouteId="@expandedDetail.Id" @ref="reviewsListComponent" />
+                                            </div>
                                         </div>
                                     }
                                 </td>
@@ -313,6 +339,15 @@
     private string pendingTag = string.Empty;
     private bool tagSaveError;
 
+    // Milestone 6: Social features state (per expanded row)
+    private int? currentUserRating;
+    private double averageRating;
+    private int ratingCount;
+    private ReviewsList? reviewsListComponent;
+
+    // Milestone 6: Intersection counts for list badges (loaded lazily)
+    private Dictionary<Guid, int> intersectionCounts = [];
+
     protected override async Task OnInitializedAsync()
     {
         var userId = CurrentUserService.UserId;
@@ -321,6 +356,24 @@
         var routes = await RouteService.SearchRoutesAsync(userId, new RouteSearchFilter());
         RouteList = routes.ToList();
         TotalDistanceM = RouteList.Sum(r => r.DistanceM);
+
+        // Lazily load intersection counts for badge display — runs after first render
+        _ = LoadIntersectionCountsAsync();
+    }
+
+    private async Task LoadIntersectionCountsAsync()
+    {
+        if (RouteList == null) return;
+        try
+        {
+            var ids = RouteList.Select(r => r.Id).ToList();
+            intersectionCounts = await SocialService.CountIntersectionsForRoutesAsync(ids);
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load intersection counts for route list");
+        }
     }
 
     private async Task ToggleRow(Guid id)
@@ -337,6 +390,43 @@
         expandedDetail = await RouteService.GetRouteDetailAsync(userId, id);
         expandedTags = expandedDetail?.Tags.ToList() ?? [];
         loadingDetail = false;
+
+        // Reset and load social state for newly expanded row
+        currentUserRating = null;
+        averageRating = 0;
+        ratingCount = 0;
+        await LoadRatingsAsync(id);
+    }
+
+    private async Task LoadRatingsAsync(Guid routeId)
+    {
+        try
+        {
+            var ratings = await SocialService.GetRatingsForRouteAsync(routeId);
+            averageRating = ratings.AverageRating;
+            ratingCount = ratings.RatingCount;
+            currentUserRating = ratings.CurrentUserRating;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to load ratings for route {RouteId}", routeId);
+        }
+    }
+
+    private void OnRatingSubmitted(int rating)
+    {
+        currentUserRating = rating;
+        StateHasChanged();
+    }
+
+    private async Task OnReviewSubmitted(ReviewDto review)
+    {
+        Logger.LogInformation("Review submitted in Routes accordion: {ReviewId}", review?.ReviewId);
+        if (reviewsListComponent != null)
+        {
+            await reviewsListComponent.RefreshReviews();
+            StateHasChanged();
+        }
     }
 
     private async Task RemoveTag(string tag)
@@ -376,7 +466,8 @@
                 Id = expandedDetail.Id, Name = expandedDetail.Name, Date = expandedDetail.Date,
                 Mode = expandedDetail.Mode, DistanceM = expandedDetail.DistanceM,
                 ElevGainM = expandedDetail.ElevGainM, Tags = expandedTags.ToList(),
-                Notes = expandedDetail.Notes, Points = expandedDetail.Points
+                Notes = expandedDetail.Notes, Points = expandedDetail.Points,
+                UserId = expandedDetail.UserId
             };
         }
     }

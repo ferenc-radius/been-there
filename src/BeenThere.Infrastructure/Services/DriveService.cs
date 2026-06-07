@@ -62,6 +62,11 @@ public sealed partial class DriveService : IDriveService
         {
             throw;
         }
+        catch (Google.GoogleApiException gex) when (gex.HttpStatusCode == System.Net.HttpStatusCode.Forbidden && gex.Message.Contains("insufficient"))
+        {
+            throw new DriveReauthenticationRequiredException(
+                "Drive permissions expired or insufficient. Please sign out and sign in again to re-grant access.", gex);
+        }
         catch (Exception ex)
         {
             LogFolderError(_logger, userId, ex);

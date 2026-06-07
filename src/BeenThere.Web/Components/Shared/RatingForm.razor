@@ -1,0 +1,111 @@
+@using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
+@inject IRouteSocialService SocialService
+@inject ILogger<RatingForm> Logger
+
+<div class="flex flex-col gap-3 p-4 bg-surface-overlay rounded">
+    <div class="text-sm font-semibold text-slate-200">Rate this route</div>
+    
+    <div class="flex gap-2">
+        @for (int i = 1; i <= 5; i++)
+        {
+            var star = i;
+            <button
+                type="button"
+                class="@GetStarClass(star)"
+                disabled="@IsSubmitting"
+                @onclick="@(() => OnSelectRating(star))">
+                @if (star <= SelectedRating)
+                {
+                    <span class="text-lg">★</span>
+                }
+                else
+                {
+                    <span class="text-lg text-slate-600">☆</span>
+                }
+            </button>
+        }
+    </div>
+
+    @if (AverageRating > 0)
+    {
+        <div class="text-xs text-slate-400">
+            Average: @AverageRating (@RatingCount @(RatingCount == 1 ? "rating" : "ratings"))
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="text-xs text-red-400">@ErrorMessage</div>
+    }
+
+    @if (SubmitMessage != null)
+    {
+        <div class="text-xs text-green-400">@SubmitMessage</div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid RouteId { get; set; }
+
+    [Parameter]
+    public int? CurrentUserRating { get; set; }
+
+    [Parameter]
+    public double AverageRating { get; set; }
+
+    [Parameter]
+    public int RatingCount { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnRatingSubmitted { get; set; }
+
+    private int SelectedRating;
+    private bool IsSubmitting;
+    private string? ErrorMessage;
+    private string? SubmitMessage;
+    private System.Threading.Timer? ClearMessageTimer;
+
+    protected override void OnInitialized()
+    {
+        SelectedRating = CurrentUserRating ?? 0;
+    }
+
+    private string GetStarClass(int star) => $"transition-colors {(star <= SelectedRating ? "text-yellow-400 hover:text-yellow-300" : "text-slate-600 hover:text-slate-500")} disabled:opacity-50";
+
+    private async Task OnSelectRating(int rating)
+    {
+        SelectedRating = rating;
+        IsSubmitting = true;
+        ErrorMessage = null;
+        SubmitMessage = null;
+
+        try
+        {
+            Logger.LogInformation("Submitting rating {Rating} for route {RouteId}", rating, RouteId);
+            var result = await SocialService.SubmitRatingAsync(RouteId, rating);
+            AverageRating = result.AverageRating;
+            RatingCount = result.RatingCount;
+            CurrentUserRating = result.CurrentUserRating;
+            SubmitMessage = "Rating saved!";
+            ClearMessageTimer?.Dispose();
+            ClearMessageTimer = new System.Threading.Timer(_ => { SubmitMessage = null; InvokeAsync(StateHasChanged); }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+            await OnRatingSubmitted.InvokeAsync(rating);
+        }
+        catch (ArgumentException ex)
+        {
+            Logger.LogWarning(ex, "Invalid rating");
+            ErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error submitting rating");
+            ErrorMessage = "Error submitting rating";
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+}

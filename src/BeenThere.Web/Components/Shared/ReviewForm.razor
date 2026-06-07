@@ -1,0 +1,95 @@
+@using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
+@inject IRouteSocialService SocialService
+@inject ILogger<ReviewForm> Logger
+
+<div class="flex flex-col gap-3 p-4 bg-surface-overlay rounded">
+    <label class="text-sm font-semibold text-slate-100">Write a review</label>
+    
+    <textarea
+        style="color: #f1f5f9; background-color: #1e293b;"
+        class="w-full border border-surface-border rounded text-sm placeholder:text-slate-500 p-3 focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand resize-none"
+        rows="4"
+        maxlength="500"
+        placeholder="Share your experience with this route..."
+        disabled="@IsSubmitting"
+        @bind="ReviewText"></textarea>
+
+    <div class="text-xs text-slate-400">
+        @ReviewText.Length / 500 characters
+    </div>
+
+    <button
+        type="button"
+        class="px-4 py-2 bg-brand hover:bg-brand/80 text-white text-sm font-medium rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        disabled="@(IsSubmitting || ReviewText.Length == 0)"
+        @onclick="OnSubmitReview">
+        @if (IsSubmitting)
+        {
+            <span>Saving...</span>
+        }
+        else
+        {
+            <span>Post Review</span>
+        }
+    </button>
+
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="text-xs text-red-400">@ErrorMessage</div>
+    }
+
+    @if (SubmitMessage != null)
+    {
+        <div class="text-xs text-green-400">@SubmitMessage</div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid RouteId { get; set; }
+
+    [Parameter]
+    public EventCallback<ReviewDto> OnReviewSubmitted { get; set; }
+
+    private string ReviewText = string.Empty;
+    private bool IsSubmitting;
+    private string? ErrorMessage;
+    private string? SubmitMessage;
+    private System.Threading.Timer? ClearMessageTimer;
+
+    private async Task OnSubmitReview()
+    {
+        if (ReviewText.Length == 0 || ReviewText.Length > 500) return;
+
+        IsSubmitting = true;
+        ErrorMessage = null;
+        SubmitMessage = null;
+
+        try
+        {
+            Logger.LogInformation("Submitting review for route {RouteId} with text length {TextLength}", RouteId, ReviewText.Length);
+            var result = await SocialService.SubmitReviewAsync(RouteId, ReviewText);
+            Logger.LogInformation("Review saved successfully: {ReviewId}", result.ReviewId);
+            await OnReviewSubmitted.InvokeAsync(result);
+            ReviewText = string.Empty;
+            SubmitMessage = "Review posted!";
+            ClearMessageTimer?.Dispose();
+            ClearMessageTimer = new System.Threading.Timer(_ => { SubmitMessage = null; InvokeAsync(StateHasChanged); }, null, TimeSpan.FromSeconds(2), Timeout.InfiniteTimeSpan);
+        }
+        catch (ArgumentException ex)
+        {
+            Logger.LogWarning(ex, "Invalid review");
+            ErrorMessage = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error submitting review");
+            ErrorMessage = "Error submitting review";
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+}

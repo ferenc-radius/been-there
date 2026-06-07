@@ -192,9 +192,9 @@ User can filter the library by radius + length, open a route detail with elevati
 **Goal:** support multi-user visibility (private-by-default sharing), allow users to rate and review routes (1–5 stars, signed-in users only), and provide a "been-there too" intersection feature showing other users who overlap a route (count + expandable detail).
 
 ### Tasks
-- [ ] Data model: add `IsPublic` (bool, default false) to `Route`.
+- [ ] Data model: Route entity now has built-in multi-user support via UserId + global query filter updates.
 - [ ] Schema: new tables `RouteRating` and `RouteReview` with appropriate FKs, timestamps, and indexes; `RouteReview` has `IsFlagged` for moderation.
-- [ ] Visibility: extend global query filter so listings return `r.IsPublic == true || r.UserId == currentUserId`.
+- [ ] Visibility: update global query filter to show all routes to all users (no public/private distinction).
 - [ ] Services: add `IRouteSocialService` + `RouteSocialService` handling rating aggregation, review CRUD, and intersection analysis (use PostGIS `ST_Intersection` / `ST_Length` on geography for overlap metrics).
 - [ ] API: add handlers for ratings/reviews/intersections (GET/POST endpoints, auth required for writes).
 - [ ] UI: surface average rating and review count in `Routes.razor` and `MapComponent`; route detail modal shows reviews, rating form, and "been-there too" expandable list.
@@ -202,11 +202,12 @@ User can filter the library by radius + length, open a route detail with elevati
 - [ ] Performance: compute intersections or expensive metrics as background jobs and cache summaries; provide pagination for reviews.
 
 ### Done when
-User can opt to share a route, other users can see shared routes, authenticated users can submit one rating (1–5) and textual reviews per route, and the "been-there too" panel shows how many and which users intersect that route with overlap metrics.
+All users can see all routes, authenticated users can submit one rating (1–5) and textual reviews per route, and the "been-there too" panel shows how many and which users intersect that route with overlap metrics.
 
 ### Notes
-- Routes remain private by default; sharing is opt-in via `IsPublic`.
+- All routes are inherently visible to all users — no sharing toggle (core app philosophy: "I have been there").
 - Reviews require login and display reviewer name; ratings are one-per-user per-route.
+- Ownership checks remain for edit/delete operations; visibility is not gated.
 
 ---
 
@@ -329,6 +330,30 @@ User types "Fontainebleau" + selects 25 km and the library shows only routes who
 | Q8 | SignIn/SignOut | Razor components wrapping `/signin`, `/signout` | ADR-0001 (implicit) |
 | Q9 | Secrets injection | `.env` file (local) + env vars (prod) | ADR-0009 |
 | Q10 | Testing | Unit (mocked) + integration (real PostGIS) | ADR-0011 (new) |
+
+### Implementation Blocked By
+None — all decisions are locked and non-blocking.
+
+---
+
+## Milestone 6 — Decision Log
+
+**Status:** Decisions locked via Planception interrogation (2026-06-07)
+
+### Resolved Decisions
+
+| ID | Decision | Answer | Evidence |
+|---|---|---|---|
+| Q1 | Rating mutability | One row per (UserId, RouteId); updateable in-place; no history | Design decision |
+| Q2 | Review mutability | One row per (UserId, RouteId); editable by author; deletable; no history | Design decision |
+| Q3 | Review content | Max 500 chars; optional (empty = soft-delete); no minimum length | Design decision |
+| Q4 | Intersection computation | On-demand with 5-min memory cache keyed by (RouteId, CurrentUserId) | Design decision |
+| Q5 | Overlap metric | % of queried route overlapped (intersection_length / route_A_length * 100); sorted descending | Design decision |
+| Q6 | Result pagination | Hard limit 50 users shown; total count in badge; no pagination UI for MVP | Design decision |
+| Q7 | Visibility & deletion | Hard delete ratings/reviews; all routes visible to all users (no public/private distinction) | Design decision |
+| Q8 | Sharing model | All routes inherently shared; no sharing toggle needed (core app philosophy: "I have been there") | Design decision |
+| Q9 | Review flagging | Flag button per review; dropdown modal with reasons (Spam, Harassment, Off-topic, Other) | Design decision |
+| Q10 | Contract safety | No internal IDs/UserIds exposed; display names only; admin fields (`FlagCount`) gated | Design decision |
 
 ### Implementation Blocked By
 None — all decisions are locked and non-blocking.

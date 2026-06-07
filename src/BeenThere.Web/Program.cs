@@ -103,5 +103,37 @@ app.MapPost("/api/preferences/stick-figure", BeenThere.Web.Handlers.PreferencesH
     .RequireAuthorization()
     .DisableAntiforgery();
 
+// Milestone 6 social features endpoints
+app.MapGet("/api/routes/{routeId}/ratings", BeenThere.Web.Handlers.SocialHandlers.GetRatings)
+    .WithName("GetRatings");
+
+app.MapPost("/api/routes/{routeId}/ratings", BeenThere.Web.Handlers.SocialHandlers.SubmitRating)
+    .WithName("SubmitRating")
+    .RequireAuthorization()
+    .DisableAntiforgery();
+
+app.MapGet("/api/routes/{routeId}/reviews", BeenThere.Web.Handlers.SocialHandlers.GetReviews)
+    .WithName("GetReviews");
+
+app.MapPost("/api/routes/{routeId}/reviews", BeenThere.Web.Handlers.SocialHandlers.SubmitReview)
+    .WithName("SubmitReview")
+    .RequireAuthorization()
+    .DisableAntiforgery();
+
+app.MapDelete("/api/reviews/{reviewId}", BeenThere.Web.Handlers.SocialHandlers.DeleteReview)
+    .WithName("DeleteReview")
+    .RequireAuthorization()
+    .DisableAntiforgery();
+
+app.MapPost("/api/reviews/{reviewId}/flag", BeenThere.Web.Handlers.SocialHandlers.FlagReview)
+    .WithName("FlagReview")
+    .DisableAntiforgery();
+
+app.MapGet("/api/routes/{routeId}/intersections", BeenThere.Web.Handlers.SocialHandlers.GetIntersections)
+    .WithName("GetIntersections");
+
+app.MapGet("/api/routes/{routeId}/intersections/count", BeenThere.Web.Handlers.SocialHandlers.CountIntersections)
+    .WithName("CountIntersections");
+
 app.Run();
 
