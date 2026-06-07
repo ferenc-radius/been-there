@@ -1,0 +1,15 @@
+{
+  "name": "been-there-frontend-assets",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Frontend asset manifest for BeenThere (Leaflet + Bootstrap plugins)",
+  "dependencies": {
+    "bootstrap": "^5.3.3",
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
+    "leaflet.heat": "^0.2.0"
+  },
+  "scripts": {
+    "postinstall": "mkdir -p src/BeenThere.Web/wwwroot/lib/bootstrap && cp -R node_modules/bootstrap/dist/* src/BeenThere.Web/wwwroot/lib/bootstrap/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet && cp -R node_modules/leaflet/dist/* src/BeenThere.Web/wwwroot/lib/leaflet/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet.markercluster && cp -R node_modules/leaflet.markercluster/dist/* src/BeenThere.Web/wwwroot/lib/leaflet.markercluster/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet.heat && cp -R node_modules/leaflet.heat/dist/* src/BeenThere.Web/wwwroot/lib/leaflet.heat/ || true"
+  }
+}

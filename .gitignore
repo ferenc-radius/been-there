@@ -489,3 +489,7 @@ codedb.snapshot
 
 # Local DataProtection keys (dev only)
 **/.dataprotection-keys/
+
+# Frontend dependencies (managed via npm; built at runtime)
+node_modules/
+src/BeenThere.Web/wwwroot/lib/

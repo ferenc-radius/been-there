@@ -1,5 +1,12 @@
 @page "/"
 
+@using BeenThere.Web.Components
+@using BeenThere.Core.Interfaces
+@using BeenThere.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject ICurrentUserService CurrentUserService
+
 <PageTitle>BeenThere — Map</PageTitle>
 
 <div class="flex h-full">
@@ -17,24 +24,59 @@
         </div>
 
         <div class="flex-1 overflow-y-auto">
-            <div class="flex flex-col items-center justify-center h-32 text-slate-600">
-                <p class="text-sm">No routes yet — import a GPX to get started.</p>
-            </div>
+            @if (Routes == null)
+            {
+                <div class="flex items-center justify-center h-32 text-slate-600">
+                    <p class="text-sm">Loading…</p>
+                </div>
+            }
+            else if (Routes.Count == 0)
+            {
+                <div class="flex flex-col items-center justify-center h-32 text-slate-600">
+                    <p class="text-sm">No routes yet — import a GPX to get started.</p>
+                </div>
+            }
+            else
+            {
+                <div class="divide-y divide-surface-border">
+                    @foreach (var route in Routes)
+                    {
+                        <div class="px-4 py-3 hover:bg-surface-overlay cursor-pointer transition-colors">
+                            <p class="text-sm font-medium text-slate-200">@route.Name</p>
+                            <p class="text-xs text-slate-500 mt-1">@((route.DistanceM / 1000d).ToString("F1")) km</p>
+                        </div>
+                    }
+                </div>
+            }
         </div>
 
         <div class="px-4 py-3 border-t border-surface-border">
-            <p class="text-xs text-slate-500">0 routes · 0 km total</p>
+            <p class="text-xs text-slate-500">@(Routes?.Count ?? 0) routes · @((TotalDistanceM / 1000d).ToString("F0")) km total</p>
         </div>
 
     </aside>
 
     <div class="flex-1 relative bg-surface-overlay">
-        <div class="absolute inset-0 flex items-center justify-center text-slate-600">
-            <div class="text-center space-y-3">
-                <Icon Name="map" Size="48" Class="mx-auto opacity-30" />
-                <p class="text-sm">Leaflet map coming in Milestone 4</p>
-            </div>
-        </div>
+        <MapComponent />
     </div>
 
 </div>
+
+@code {
+    private List<BeenThere.Core.Domain.Route>? Routes;
+    private double TotalDistanceM;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userId = CurrentUserService.UserId;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        Routes = await Db.Routes
+            .AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.Date)
+            .ToListAsync();
+
+        TotalDistanceM = Routes?.Sum(r => r.DistanceM) ?? 0;
+    }
+}

@@ -144,6 +144,9 @@ No commands defined yet — update this section when the solution is scaffolded.
 - **Surgical changes only.** Change exactly what was requested. Do not refactor, rename, reformat, or "improve" surrounding code unless explicitly asked.
 - **No invented requirements.** Do not add features, fields, validations, or error cases that were not asked for — even if they seem obviously useful.
 - **Cite evidence.** When making a claim about how the codebase works, quote the relevant file and line. Do not assert from memory.
+ - **No external libraries without approval.** Avoid adding vendored third-party JS/CSS files directly into the repository. When external client-side packages are required, prefer declaring them in a `package.json` at the repo root, document install/build steps, and request approval before introducing new dependencies.
+ - **No external libraries without approval.** Avoid adding vendored third-party JS/CSS files directly into the repository. When external client-side packages are required, prefer declaring them in a `package.json` at the repo root, document install/build steps, and request approval before introducing new dependencies.
+ - **No inline handlers.** Avoid large monolithic `Handlers.cs` files with mixed responsibilities. Split HTTP endpoint handlers into focused subdomain handler files under `src/BeenThere.Web/Handlers/` (for example, `AuthHandlers.cs`, `RouteHandlers.cs`). Keep each handler method small, testable, and document which route it serves.
 
 ### Dependency version policy
 

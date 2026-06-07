@@ -1,0 +1,17 @@
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+<div id="beenthere-map" style="height: 600px; width: 100%;"></div>
+
+@code {
+    private IJSObjectReference? module;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "/js/map-interop.js");
+        await module.InvokeVoidAsync("initMap", "beenthere-map", new { center = new double[] { 51.505, -0.09 }, zoom = 6 });
+        await module.InvokeVoidAsync("loadRoutesFromUrl", "beenthere-map", "/api/routes/geojson");
+    }
+}

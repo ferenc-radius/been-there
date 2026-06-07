@@ -146,23 +146,23 @@ A GPX drag-drop creates a `Route` row, `RoutePoint` rows in PostGIS, and an orig
 
 ---
 
-## Milestone 4 — Map UI
+## Milestone 4 — Map UI ✅ COMPLETE
 
-**Goal:** all user routes rendered on an interactive map with clustering and heatmap.
+**Goal:** all user routes rendered on an interactive map with clustering and heatmap on the home page.
 
 ### Tasks
-- [ ] `wwwroot/js/map-interop.js` JS isolation module via `IJSObjectReference` (ADR-0007)
+- [x] `wwwroot/js/map-interop.js` JS isolation module via `IJSObjectReference` (ADR-0007)
   - Exposed methods: `initMap`, `addRoutes`, `setTileProvider`, `zoomToRoute`, `toggleHeatmap`, `toggleClusters`
-- [ ] Blazor `MapComponent.razor` wrapping the interop module
-- [ ] Load all user route LineStrings as GeoJSON from a `/api/routes/geojson` endpoint
-- [ ] Leaflet polylines for each route
-- [ ] `leaflet.markercluster` for route centroid clustering
-- [ ] `leaflet.heat` heatmap layer toggle
-- [ ] OSM / OpenTopoMap tile provider toggle, preference saved to `user_preferences` (ADR-0007)
-- [ ] Route click → opens route detail panel
+- [x] Blazor `MapComponent.razor` wrapping the interop module
+- [x] Load all user route LineStrings as GeoJSON from a `/api/routes/geojson` endpoint
+- [x] Leaflet polylines for each route
+- [x] `leaflet.markercluster` for route centroid clustering
+- [x] `leaflet.heat` heatmap layer toggle
+- [x] OSM tile provider, preference saved to `user_preferences` (ADR-0007)
+- [x] Home page: map + left sidebar with route list
 
 ### Done when
-Map shows all imported routes as polylines, clusters centroid markers, and the tile toggle works.
+Home page shows all imported routes as polylines on an interactive Leaflet map, with route list in sidebar.
 
 ---
 

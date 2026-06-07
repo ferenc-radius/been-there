@@ -8,6 +8,15 @@
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["BeenThere.Web.styles.css"]" />
+    <!-- Leaflet map library (ADR-0007, managed via package.json) -->
+    <link rel="stylesheet" href="/lib/leaflet/leaflet.css" />
+    <script src="/lib/leaflet/leaflet.js"></script>
+    <!-- Leaflet marker cluster plugin -->
+    <link rel="stylesheet" href="/lib/leaflet.markercluster/MarkerCluster.css" />
+    <link rel="stylesheet" href="/lib/leaflet.markercluster/MarkerCluster.Default.css" />
+    <script src="/lib/leaflet.markercluster/leaflet.markercluster.js"></script>
+    <!-- Leaflet heat plugin -->
+    <script src="/lib/leaflet.heat/leaflet-heat.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {

@@ -2,6 +2,7 @@ using BeenThere.Infrastructure;
 using BeenThere.Infrastructure.Persistence;
 using BeenThere.Web;
 using BeenThere.Web.Components;
+using NetTopologySuite.Geometries;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -51,15 +52,20 @@ app.MapHealthChecks("/health");
 app.MapStaticAssets();
 
 // OAuth and API endpoints registered before MapRazorComponents (Blazor fallback)
-app.MapGet("/signin", Handlers.SignIn).WithName("SignIn").AllowAnonymous();
-app.MapGet("/signin-complete", Handlers.SignInComplete).WithName("SignInComplete").AllowAnonymous();
-app.MapPost("/signout", Handlers.SignOut).WithName("SignOut");
+app.MapGet("/signin", BeenThere.Web.Handlers.AuthHandlers.SignIn).WithName("SignIn").AllowAnonymous();
+app.MapGet("/signin-complete", BeenThere.Web.Handlers.AuthHandlers.SignInComplete).WithName("SignInComplete").AllowAnonymous();
+app.MapPost("/signout", BeenThere.Web.Handlers.AuthHandlers.SignOut).WithName("SignOut");
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.MapGet("/api/routes/{routeId}/download", Handlers.DownloadRoute)
-    .WithName("DownloadRoute").RequireAuthorization();
+app.MapGet("/api/routes/{routeId}/download", BeenThere.Web.Handlers.RouteHandlers.DownloadRoute)
+    .WithName("DownloadRoute")
+    .RequireAuthorization();
+
+app.MapGet("/api/routes/geojson", BeenThere.Web.Handlers.RouteHandlers.GetRoutesGeoJson)
+    .WithName("RoutesGeoJson")
+    .RequireAuthorization();
 
 app.Run();
 

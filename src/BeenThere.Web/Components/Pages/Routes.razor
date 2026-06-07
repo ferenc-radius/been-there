@@ -1,24 +1,125 @@
 @page "/routes"
 
-<PageTitle>BeenThere — Routes</PageTitle>
+@using BeenThere.Web.Components
+@using BeenThere.Core.Interfaces
+@using BeenThere.Infrastructure.Persistence
+@using Microsoft.EntityFrameworkCore
+@inject ApplicationDbContext Db
+@inject ICurrentUserService CurrentUserService
 
-<div class="max-w-3xl mx-auto px-6 py-10 space-y-6">
+<PageTitle>BeenThere — Route Library</PageTitle>
+
+<div class="max-w-7xl mx-auto px-6 py-10 space-y-6">
 
     <div class="flex items-center justify-between">
         <div>
-            <h1 class="text-xl font-semibold text-slate-100">Routes</h1>
-            <p class="text-sm text-slate-400 mt-1">Your full route library with filters.</p>
+            <h1 class="text-2xl font-bold text-slate-100">Route Library</h1>
+            <p class="text-sm text-slate-400 mt-1">Browse, filter, and analyze your imported routes.</p>
         </div>
         <a href="/import"
            class="flex items-center gap-2 rounded-lg bg-brand/90 hover:bg-brand px-4 py-2 text-sm font-medium text-white transition-colors">
             <Icon Name="upload" Size="16" />
-            Import
+            Import Route
         </a>
     </div>
 
-    <div class="rounded-2xl border border-surface-border bg-surface-raised px-6 py-16 text-center text-slate-600">
-        <Icon Name="route" Size="40" Class="mx-auto opacity-30 mb-3" />
-        <p class="text-sm">Route library coming in Milestone 3</p>
+    <!-- Stats Row -->
+    <div class="grid grid-cols-3 gap-4">
+        <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
+            <p class="text-xs text-slate-500 uppercase tracking-wide">Total Routes</p>
+            <p class="text-2xl font-bold text-slate-100 mt-2">@(RouteList?.Count ?? 0)</p>
+        </div>
+        <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
+            <p class="text-xs text-slate-500 uppercase tracking-wide">Total Distance</p>
+            <p class="text-2xl font-bold text-slate-100 mt-2">@((TotalDistanceM / 1000d).ToString("F0")) km</p>
+        </div>
+        <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
+            <p class="text-xs text-slate-500 uppercase tracking-wide">Avg Distance</p>
+            <p class="text-2xl font-bold text-slate-100 mt-2">@(RouteList?.Count > 0 ? ((TotalDistanceM / RouteList.Count) / 1000d).ToString("F1") : "—") km</p>
+        </div>
     </div>
 
+    <!-- Search and Filter -->
+    <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
+        <div class="flex items-center gap-2">
+            <Icon Name="search" Size="16" Class="text-slate-500" />
+            <input type="search"
+                   @bind="searchQuery"
+                   @bind:event="oninput"
+                   placeholder="Search by name, mode, or date…"
+                   class="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none" />
+        </div>
+    </div>
+
+    <!-- Routes Table -->
+    @if (RouteList == null)
+    {
+        <div class="rounded-lg border border-surface-border bg-surface-raised p-8 text-center">
+            <p class="text-slate-500">Loading routes…</p>
+        </div>
+    }
+    else if (FilteredRoutes.Count == 0)
+    {
+        <div class="rounded-lg border border-surface-border bg-surface-raised p-8 text-center">
+            <Icon Name="route" Size="40" Class="mx-auto opacity-30 mb-3" />
+            <p class="text-slate-500">No routes match your search.</p>
+        </div>
+    }
+    else
+    {
+        <div class="rounded-lg border border-surface-border bg-surface-raised overflow-hidden">
+            <table class="w-full text-sm">
+                <thead class="border-b border-surface-border bg-surface-overlay">
+                    <tr>
+                        <th class="px-6 py-3 text-left font-medium text-slate-300">Route Name</th>
+                        <th class="px-6 py-3 text-left font-medium text-slate-300">Date</th>
+                        <th class="px-6 py-3 text-left font-medium text-slate-300">Mode</th>
+                        <th class="px-6 py-3 text-right font-medium text-slate-300">Distance</th>
+                        <th class="px-6 py-3 text-right font-medium text-slate-300">Elev Gain</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-surface-border">
+                    @foreach (var route in FilteredRoutes)
+                    {
+                        <tr class="hover:bg-surface-overlay transition-colors cursor-pointer">
+                            <td class="px-6 py-4 text-slate-200 font-medium">@route.Name</td>
+                            <td class="px-6 py-4 text-slate-400">@route.Date.ToString("MMM d, yyyy")</td>
+                            <td class="px-6 py-4 text-slate-400">@(route.Mode ?? "—")</td>
+                            <td class="px-6 py-4 text-right text-slate-400">@((route.DistanceM / 1000d).ToString("F2")) km</td>
+                            <td class="px-6 py-4 text-right text-slate-400">@((route.ElevGainM / 1000d).ToString("F1")) km</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
 </div>
+
+@code {
+    private List<BeenThere.Core.Domain.Route>? RouteList;
+    private double TotalDistanceM;
+    private string searchQuery = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userId = CurrentUserService.UserId;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        RouteList = await Db.Routes
+            .AsNoTracking()
+            .Where(r => r.UserId == userId)
+            .OrderByDescending(r => r.Date)
+            .ToListAsync();
+
+        TotalDistanceM = RouteList?.Sum(r => r.DistanceM) ?? 0;
+    }
+
+    private List<BeenThere.Core.Domain.Route> FilteredRoutes =>
+        RouteList?.Where(r =>
+            string.IsNullOrEmpty(searchQuery) ||
+            r.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
+            (r.Mode?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
+            r.Date.ToString("MMM d, yyyy").Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+        ).ToList() ?? new();
+}

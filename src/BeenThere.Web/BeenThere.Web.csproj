@@ -20,4 +20,9 @@
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
 
+  <!-- Install frontend dependencies (npm) at build time, populating wwwroot/lib/ -->
+  <Target Name="NpmInstall" BeforeTargets="Build">
+    <Exec Command="npm install" WorkingDirectory="$(ProjectDir)../../" />
+  </Target>
+
 </Project>
