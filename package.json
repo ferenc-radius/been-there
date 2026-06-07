@@ -2,14 +2,22 @@
   "name": "been-there-frontend-assets",
   "private": true,
   "version": "0.0.0",
-  "description": "Frontend asset manifest for BeenThere (Leaflet + Bootstrap plugins)",
+  "description": "Frontend asset manifest for BeenThere (Leaflet + Tailwind CSS)",
   "dependencies": {
     "bootstrap": "^5.3.3",
     "leaflet": "^1.9.4",
     "leaflet.markercluster": "^1.5.3",
-    "leaflet.heat": "^0.2.0"
+    "leaflet.heat": "^0.2.0",
+    "tailwindcss": "^3.4.1",
+    "postcss": "^8.4.35",
+    "autoprefixer": "^10.4.17"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.1"
   },
   "scripts": {
-    "postinstall": "mkdir -p src/BeenThere.Web/wwwroot/lib/bootstrap && cp -R node_modules/bootstrap/dist/* src/BeenThere.Web/wwwroot/lib/bootstrap/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet && cp -R node_modules/leaflet/dist/* src/BeenThere.Web/wwwroot/lib/leaflet/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet.markercluster && cp -R node_modules/leaflet.markercluster/dist/* src/BeenThere.Web/wwwroot/lib/leaflet.markercluster/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet.heat && cp -R node_modules/leaflet.heat/dist/* src/BeenThere.Web/wwwroot/lib/leaflet.heat/ || true"
+    "postinstall": "mkdir -p src/BeenThere.Web/wwwroot/lib/bootstrap && cp -R node_modules/bootstrap/dist/* src/BeenThere.Web/wwwroot/lib/bootstrap/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet && cp -R node_modules/leaflet/dist/* src/BeenThere.Web/wwwroot/lib/leaflet/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet.markercluster && cp -R node_modules/leaflet.markercluster/dist/* src/BeenThere.Web/wwwroot/lib/leaflet.markercluster/ || true && mkdir -p src/BeenThere.Web/wwwroot/lib/leaflet.heat && cp -R node_modules/leaflet.heat/dist/* src/BeenThere.Web/wwwroot/lib/leaflet.heat/ || true",
+    "tailwind": "tailwindcss -i ./src/BeenThere.Web/Styles/tailwind.input.css -o ./src/BeenThere.Web/wwwroot/css/tailwind.css",
+    "tailwind:watch": "tailwindcss -i ./src/BeenThere.Web/Styles/tailwind.input.css -o ./src/BeenThere.Web/wwwroot/css/tailwind.css --watch"
   }
 }

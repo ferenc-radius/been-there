@@ -16,7 +16,8 @@ export function initMap(elementId, options = {}) {
     map,
     routesLayer: L.layerGroup().addTo(map),
     clusterLayer: null,
-    heatLayer: null
+    heatLayer: null,
+    routeFeatures: new Map() // Store features by route ID for highlighting
   };
 
   maps.set(elementId, state);
@@ -28,6 +29,7 @@ export function addRoutes(elementId, geojson) {
   if (!state) return;
 
   state.routesLayer.clearLayers();
+  state.routeFeatures.clear();
 
   // Filter out features with null geometry
   const validFeatures = geojson.features?.filter(f => f.geometry) || [];
@@ -37,6 +39,13 @@ export function addRoutes(elementId, geojson) {
     console.warn('[map-interop] No routes with geometry to render');
     return;
   }
+
+  // Store features by ID
+  validFeatures.forEach(feature => {
+    if (feature.properties?.id) {
+      state.routeFeatures.set(feature.properties.id, feature);
+    }
+  });
 
   const validGeoJson = { type: 'FeatureCollection', features: validFeatures };
   const gj = L.geoJSON(validGeoJson, {
@@ -62,14 +71,73 @@ export async function loadRoutesFromUrl(elementId, url) {
     const res = await fetch(url, { credentials: 'same-origin' });
     if (!res.ok) {
       console.error(`[map-interop] Failed to load routes: ${res.status} ${res.statusText}`);
-      return;
+      return false;
     }
     const geojson = await res.json();
     console.log(`[map-interop] Loaded ${geojson.features?.length || 0} routes`);
     addRoutes(elementId, geojson);
+    return true;
   } catch (error) {
     console.error('[map-interop] Error loading routes:', error);
+    return false;
   }
+}
+
+export function hasRoutesLoaded(elementId) {
+  const state = maps.get(elementId);
+  if (!state || !state.routesLayer) return false;
+  // Check if routesLayer has any layers (routes have been added)
+  return state.routesLayer.getLayers().length > 0;
+}
+
+export async function waitForRoutes(elementId, maxWaitMs = 5000) {
+  const startTime = performance.now();
+  while (!hasRoutesLoaded(elementId)) {
+    if (performance.now() - startTime > maxWaitMs) {
+      console.warn('[map-interop] Timeout waiting for routes to load');
+      return false;
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  console.log('[map-interop] Routes loaded and ready');
+  return true;
+}
+
+export function highlightRoute(elementId, routeId) {
+  const state = maps.get(elementId);
+  if (!state) return;
+
+  const feature = state.routeFeatures.get(routeId);
+  if (!feature) {
+    console.warn(`[map-interop] Route ${routeId} not found`);
+    return;
+  }
+
+  // Remove previous highlight
+  if (state.highlightLayer) {
+    state.map.removeLayer(state.highlightLayer);
+    state.highlightLayer = null;
+  }
+
+  // Create highlighted layer with distinct style
+  const highlightGeoJson = L.geoJSON(feature, {
+    style: { color: '#ff6b6b', weight: 5, opacity: 0.9 }
+  });
+
+  state.highlightLayer = highlightGeoJson;
+  state.map.addLayer(highlightGeoJson);
+
+  // Zoom to route
+  try {
+    const bounds = highlightGeoJson.getBounds();
+    if (bounds.isValid()) {
+      state.map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  } catch (error) {
+    console.warn('[map-interop] Error fitting to highlighted route:', error);
+  }
+
+  console.log(`[map-interop] Highlighted route ${routeId}`);
 }
 
 export function setTileProvider(elementId, tileUrl, attribution) {
@@ -122,5 +190,50 @@ export function toggleClusters(elementId, enabled) {
       state.clusterLayer = null;
       state.map.addLayer(state.routesLayer);
     }
+  }
+}
+
+export function setStickFigureForRoute(elementId, routeId, stickFigureSvg) {
+  const state = maps.get(elementId);
+  if (!state || !stickFigureSvg) return;
+
+  // Remove existing stick figure marker if any
+  if (state.markersLayer) {
+    state.map.removeLayer(state.markersLayer);
+    state.markersLayer = null;
+  }
+
+  const feature = state.routeFeatures.get(routeId);
+  if (!feature) return;
+
+  const svgIcon = L.divIcon({
+    html: stickFigureSvg,
+    iconSize: [32, 48],
+    iconAnchor: [16, 48],
+    popupAnchor: [0, -48],
+    className: 'stick-figure-marker'
+  });
+
+  if (feature.geometry?.type === 'LineString' && feature.geometry.coordinates.length > 0) {
+    const [lng, lat] = feature.geometry.coordinates[0];
+    const marker = L.marker([lat, lng], { icon: svgIcon });
+    marker.bindPopup(feature.properties?.name || 'Route');
+    state.markersLayer = L.layerGroup().addTo(state.map);
+    state.markersLayer.addLayer(marker);
+  }
+}
+
+export function clearHighlightAndMarkers(elementId) {
+  const state = maps.get(elementId);
+  if (!state) return;
+
+  if (state.highlightLayer) {
+    state.map.removeLayer(state.highlightLayer);
+    state.highlightLayer = null;
+  }
+
+  if (state.markersLayer) {
+    state.map.removeLayer(state.markersLayer);
+    state.markersLayer = null;
   }
 }

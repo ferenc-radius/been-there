@@ -1,5 +1,7 @@
 @page "/profile"
 @attribute [Authorize]
+@using Microsoft.JSInterop
+@using BeenThere.Core.Interfaces
 
 <PageTitle>BeenThere — Profile</PageTitle>
 
@@ -33,6 +35,116 @@
                 </div>
             </div>
 
+            <div class="rounded-2xl border border-surface-border bg-surface-raised">
+                <div class="px-5 py-4 border-b border-surface-border">
+                    <h2 class="text-lg font-semibold text-slate-200">Choose Your Stick Figure</h2>
+                    <p class="text-xs text-slate-400 mt-1">This will appear at the start of your routes on the map.</p>
+                </div>
+                <div class="p-5">
+                    @if (AvailableFigures == null)
+                    {
+                        <p class="text-slate-400 text-sm">Loading...</p>
+                    }
+                    else
+                    {
+                        <div class="grid grid-cols-4 gap-4">
+                            @foreach (var figure in AvailableFigures)
+                            {
+                                <button @onclick="() => SelectStickFigure(figure.Key)"
+                                        disabled="@(IsSaving)"
+                                        class="p-3 rounded-lg border-2 transition-all hover:bg-surface-overlay disabled:opacity-50 @(SelectedStickFigure == figure.Key ? "border-brand bg-surface-overlay" : "border-surface-border")">
+                                    <div class="flex justify-center mb-2" style="height: 48px;">
+                                        @((MarkupString)figure.Svg)
+                                    </div>
+                                    <p class="text-xs text-center text-slate-300">@figure.Name</p>
+                                </button>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+
         </div>
     </Authorized>
 </AuthorizeView>
+
+@code {
+    private List<StickFigureOption>? AvailableFigures;
+    private string SelectedStickFigure = "classic";
+    private bool IsSaving = false;
+
+    [Inject]
+    private IPreferencesService PreferencesService { get; set; } = default!;
+
+    [Inject]
+    private ICurrentUserService CurrentUserService { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var userId = CurrentUserService.UserId;
+            if (userId is not null)
+            {
+                var prefs = await PreferencesService.GetPreferencesAsync(userId);
+                SelectedStickFigure = prefs.StickFigure;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Profile] Error loading preferences: {ex.Message}");
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        // Load stick figures from JS module (JS interop can only happen here)
+        try
+        {
+            var module = await JS.InvokeAsync<IJSObjectReference>("import", "/js/stick-figures.js");
+            var figures = await module.InvokeAsync<List<StickFigureOption>>("getAllStickFigures");
+            AvailableFigures = figures;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"[Profile] Error loading stick figures: {ex.Message}");
+            AvailableFigures = new List<StickFigureOption>();
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectStickFigure(string figureKey)
+    {
+        if (IsSaving) return;
+        IsSaving = true;
+
+        try
+        {
+            await JS.InvokeVoidAsync("console.log", $"[Profile] Saving stick figure: {figureKey}");
+
+            var userId = CurrentUserService.UserId!
+;
+            await PreferencesService.UpdateStickFigureAsync(userId, figureKey);
+            SelectedStickFigure = figureKey;
+
+            await JS.InvokeVoidAsync("console.log", $"[Profile] Stick figure saved: {figureKey}");
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"[Profile] Error saving preference: {ex.Message}");
+        }
+        finally
+        {
+            IsSaving = false;
+        }
+    }
+
+    private sealed record StickFigureOption(string Key, string Name, string Svg);
+}
+

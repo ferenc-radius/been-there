@@ -12,7 +12,6 @@
       "stopAtEntry": false,
       "serverReadyAction": {
         "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
-        "uriFormat": "{0}",
         "action": "openExternally"
       }
     }

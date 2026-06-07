@@ -2,10 +2,7 @@
 
 @using BeenThere.Web.Components
 @using BeenThere.Core.Interfaces
-@using BeenThere.Infrastructure.Persistence
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext Db
-@inject ICurrentUserService CurrentUserService
 
 <PageTitle>BeenThere — Route Library</PageTitle>
 
@@ -97,6 +94,12 @@
 </div>
 
 @code {
+    [Inject]
+    private IRouteService RouteService { get; set; } = default!;
+
+    [Inject]
+    private ICurrentUserService CurrentUserService { get; set; } = default!;
+
     private List<BeenThere.Core.Domain.Route>? RouteList;
     private double TotalDistanceM;
     private string searchQuery = string.Empty;
@@ -106,12 +109,7 @@
         var userId = CurrentUserService.UserId;
         if (string.IsNullOrEmpty(userId)) return;
 
-        RouteList = await Db.Routes
-            .AsNoTracking()
-            .Where(r => r.UserId == userId)
-            .OrderByDescending(r => r.Date)
-            .ToListAsync();
-
+        RouteList = (await RouteService.GetRoutesAsync(userId)).ToList();
         TotalDistanceM = RouteList?.Sum(r => r.DistanceM) ?? 0;
     }
 

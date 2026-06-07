@@ -12,4 +12,7 @@ public sealed class UserPreferences
 
     /// <summary>Whether the import help accordion has been dismissed by the user.</summary>
     public bool ImportHelpDismissed { get; set; }
+
+    /// <summary>Stick figure style for route markers: "classic" | "waving" | "sitting" | "running".</summary>
+    public string StickFigure { get; set; } = "classic";
 }

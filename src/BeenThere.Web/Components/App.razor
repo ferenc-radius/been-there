@@ -4,6 +4,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="google" content="notranslate" />
     <base href="/" />
     <ResourcePreloader />
     <link rel="stylesheet" href="@Assets["app.css"]" />
@@ -17,32 +18,8 @@
     <script src="/lib/leaflet.markercluster/leaflet.markercluster.js"></script>
     <!-- Leaflet heat plugin -->
     <script src="/lib/leaflet.heat/leaflet-heat.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        surface: {
-                            DEFAULT: '#0f1117',
-                            raised: '#1a1d27',
-                            overlay: '#22263a',
-                            border: '#2d3250',
-                        },
-                        brand: {
-                            DEFAULT: '#6366f1',
-                            hover: '#818cf8',
-                            muted: '#3730a3',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS (built via npm/PostCSS, see package.json) -->
+    <link rel="stylesheet" href="/css/tailwind.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />

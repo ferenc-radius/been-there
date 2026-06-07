@@ -56,4 +56,23 @@ internal static class RouteHandlers
         var fc = new { type = "FeatureCollection", features };
         return Results.Json(fc);
     }
+
+    internal static async Task<IResult> DeleteRoute(
+        Guid routeId,
+        ApplicationDbContext db,
+        ICurrentUserService currentUser)
+    {
+        var userId = currentUser.UserId!;
+
+        var route = await db.Routes.FirstOrDefaultAsync(r => r.Id == routeId && r.UserId == userId);
+        if (route == null)
+        {
+            return Results.NotFound();
+        }
+
+        db.Routes.Remove(route);
+        await db.SaveChangesAsync();
+
+        return Results.Ok();
+    }
 }

@@ -2,10 +2,8 @@
 
 @using BeenThere.Web.Components
 @using BeenThere.Core.Interfaces
-@using BeenThere.Infrastructure.Persistence
 @using Microsoft.EntityFrameworkCore
-@inject ApplicationDbContext Db
-@inject ICurrentUserService CurrentUserService
+@using Microsoft.JSInterop
 
 <PageTitle>BeenThere — Map</PageTitle>
 
@@ -41,9 +39,20 @@
                 <div class="divide-y divide-surface-border">
                     @foreach (var route in Routes)
                     {
-                        <div class="px-4 py-3 hover:bg-surface-overlay cursor-pointer transition-colors">
-                            <p class="text-sm font-medium text-slate-200">@route.Name</p>
-                            <p class="text-xs text-slate-500 mt-1">@((route.DistanceM / 1000d).ToString("F1")) km</p>
+                        <div class="px-4 py-3 hover:bg-surface-overlay transition-colors group @(SelectedRouteId == route.Id ? "bg-surface-overlay border-l-2 border-brand" : "")" 
+                             @onclick="() => SelectRoute(route.Id)">
+                            <div class="flex items-start justify-between">
+                                <div class="flex-1 cursor-pointer">
+                                    <p class="text-sm font-medium text-slate-200">@route.Name</p>
+                                    <p class="text-xs text-slate-500 mt-1">@((route.DistanceM / 1000d).ToString("F1")) km</p>
+                                </div>
+                                <button @onclick:stopPropagation="true"
+                                        @onclick="() => DeleteRouteWithConfirmation(route.Id, route.Name)"
+                                        class="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-red-400 text-slate-500"
+                                        title="Delete route">
+                                    <Icon Name="trash" Size="16" />
+                                </button>
+                            </div>
                         </div>
                     }
                 </div>
@@ -57,26 +66,68 @@
     </aside>
 
     <div class="flex-1 relative bg-surface-overlay">
-        <MapComponent />
+        <MapComponent SelectedRouteId="SelectedRouteId" />
     </div>
 
 </div>
 
 @code {
+    [Inject]
+    private IRouteService RouteService { get; set; } = default!;
+
+    [Inject]
+    private ICurrentUserService CurrentUserService { get; set; } = default!;
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
     private List<BeenThere.Core.Domain.Route>? Routes;
     private double TotalDistanceM;
+    private Guid? SelectedRouteId;
 
     protected override async Task OnInitializedAsync()
     {
         var userId = CurrentUserService.UserId;
         if (string.IsNullOrEmpty(userId)) return;
 
-        Routes = await Db.Routes
-            .AsNoTracking()
-            .Where(r => r.UserId == userId)
-            .OrderByDescending(r => r.Date)
-            .ToListAsync();
-
+        Routes = (await RouteService.GetRoutesAsync(userId)).ToList();
         TotalDistanceM = Routes?.Sum(r => r.DistanceM) ?? 0;
+    }
+
+    private void SelectRoute(Guid routeId)
+    {
+        SelectedRouteId = SelectedRouteId == routeId ? null : routeId;
+    }
+
+    private async Task DeleteRouteWithConfirmation(Guid routeId, string routeName)
+    {
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete route '{routeName}'? This cannot be undone."))
+        {
+            return;
+        }
+
+        await DeleteRoute(routeId);
+    }
+
+    private async Task DeleteRoute(Guid routeId)
+    {
+        var userId = CurrentUserService.UserId;
+        if (userId is null) return;
+
+        try
+        {
+            var deleted = await RouteService.DeleteRouteAsync(userId, routeId);
+            if (deleted && Routes != null)
+            {
+                Routes = Routes.Where(r => r.Id != routeId).ToList();
+                TotalDistanceM = Routes.Sum(r => r.DistanceM);
+                if (SelectedRouteId == routeId) SelectedRouteId = null;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+        }
     }
 }

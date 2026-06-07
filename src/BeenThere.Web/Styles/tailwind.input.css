@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .nav-rail-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 transition-colors hover:text-slate-100 hover:bg-surface-overlay;
+  }
+
+  .nav-rail-link--active {
+    @apply text-brand bg-brand/10;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 rounded-lg bg-brand text-white font-medium hover:bg-brand/90 transition-colors;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 rounded-lg border border-surface-border text-slate-300 font-medium hover:bg-surface-overlay transition-colors;
+  }
+}

@@ -23,6 +23,8 @@ public static class InfrastructureServiceExtensions
         services.AddScoped<IRouteFileParser, XDocumentKmlParser>();
         services.AddScoped<IRouteAssembler, RouteAssembler>();
         services.AddScoped<IImportService, ImportService>();
+        services.AddScoped<IPreferencesService, PreferencesService>();
+        services.AddScoped<IRouteService, RouteService>();
         services.AddSingleton<IDuplicateDetectionChannel, NullDuplicateDetectionChannel>();
 
         services.AddDbContext<ApplicationDbContext>(options =>

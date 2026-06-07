@@ -12,6 +12,15 @@ EnvFile.Load(builder);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Configure HttpClient with BaseAddress for relative URLs in Blazor components
+builder.Services.AddScoped<HttpClient>(sp =>
+{
+    // For Blazor Server, relative URLs need an absolute BaseAddress
+    // Use localhost:7180 for development; adjust for production as needed
+    var baseAddress = new Uri("https://localhost:7180/");
+    var client = new HttpClient { BaseAddress = baseAddress };
+    return client;
+});
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddAuthorization();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -66,6 +75,20 @@ app.MapGet("/api/routes/{routeId}/download", BeenThere.Web.Handlers.RouteHandler
 app.MapGet("/api/routes/geojson", BeenThere.Web.Handlers.RouteHandlers.GetRoutesGeoJson)
     .WithName("RoutesGeoJson")
     .RequireAuthorization();
+
+app.MapDelete("/api/routes/{routeId}", BeenThere.Web.Handlers.RouteHandlers.DeleteRoute)
+    .WithName("DeleteRoute")
+    .RequireAuthorization()
+    .DisableAntiforgery();
+
+app.MapGet("/api/preferences", BeenThere.Web.Handlers.PreferencesHandlers.GetPreferences)
+    .WithName("GetPreferences")
+    .RequireAuthorization();
+
+app.MapPost("/api/preferences/stick-figure", BeenThere.Web.Handlers.PreferencesHandlers.UpdateStickFigure)
+    .WithName("UpdateStickFigure")
+    .RequireAuthorization()
+    .DisableAntiforgery();
 
 app.Run();
 

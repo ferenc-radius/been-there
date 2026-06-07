@@ -1,7 +1,5 @@
 @page "/import"
 @using BeenThere.Core.Interfaces
-@inject IImportService ImportService
-@inject ICurrentUserService CurrentUser
 
 <PageTitle>BeenThere — Import</PageTitle>
 
@@ -278,6 +276,12 @@
 </div>
 
 @code {
+    [Inject]
+    private IImportService ImportService { get; set; } = default!;
+
+    [Inject]
+    private ICurrentUserService CurrentUser { get; set; } = default!;
+
     private readonly List<FileState> _files = [];
     private async Task HandleFilesAsync(InputFileChangeEventArgs e)
     {

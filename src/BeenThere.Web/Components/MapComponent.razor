@@ -1,17 +1,73 @@
 @using Microsoft.JSInterop
-@inject IJSRuntime JS
+@using BeenThere.Core.Interfaces
 
 <div id="beenthere-map" style="height: 600px; width: 100%;"></div>
 
 @code {
+    [Parameter]
+    public Guid? SelectedRouteId { get; set; }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+
+    [Inject]
+    private IPreferencesService PreferencesService { get; set; } = default!;
+
+    [Inject]
+    private ICurrentUserService CurrentUserService { get; set; } = default!;
+
     private IJSObjectReference? module;
+    private IJSObjectReference? stickFiguresModule;
+    private string? stickFigureSvg;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!firstRender) return;
 
         module = await JS.InvokeAsync<IJSObjectReference>("import", "/js/map-interop.js");
+        stickFiguresModule = await JS.InvokeAsync<IJSObjectReference>("import", "/js/stick-figures.js");
+        
         await module.InvokeVoidAsync("initMap", "beenthere-map", new { center = new double[] { 51.505, -0.09 }, zoom = 6 });
-        await module.InvokeVoidAsync("loadRoutesFromUrl", "beenthere-map", "/api/routes/geojson");
+        
+        var routesLoaded = await module.InvokeAsync<bool>("loadRoutesFromUrl", "beenthere-map", "/api/routes/geojson");
+        
+        if (routesLoaded)
+        {
+            await module.InvokeAsync<bool>("waitForRoutes", "beenthere-map", 5000);
+        }
+
+        // Pre-load the user's stick figure SVG so it's ready when a route is selected
+        try
+        {
+            var userId = CurrentUserService.UserId;
+            if (userId is not null && stickFiguresModule is not null)
+            {
+                var prefs = await PreferencesService.GetPreferencesAsync(userId);
+                stickFigureSvg = await stickFiguresModule.InvokeAsync<string>("getStickFigureSvg", prefs.StickFigure);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("console.error", $"[MapComponent] Error loading stick figure: {ex.Message}");
+        }
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (module is null) return;
+
+        if (SelectedRouteId.HasValue)
+        {
+            await module.InvokeVoidAsync("highlightRoute", "beenthere-map", SelectedRouteId.Value.ToString());
+
+            if (!string.IsNullOrEmpty(stickFigureSvg))
+            {
+                await module.InvokeVoidAsync("setStickFigureForRoute", "beenthere-map", SelectedRouteId.Value.ToString(), stickFigureSvg);
+            }
+        }
+        else
+        {
+            await module.InvokeVoidAsync("clearHighlightAndMarkers", "beenthere-map");
+        }
     }
 }
