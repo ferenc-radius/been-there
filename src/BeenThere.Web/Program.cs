@@ -72,6 +72,19 @@ app.MapGet("/api/routes/{routeId}/download", BeenThere.Web.Handlers.RouteHandler
     .WithName("DownloadRoute")
     .RequireAuthorization();
 
+app.MapGet("/api/routes/{routeId}", BeenThere.Web.Handlers.RouteHandlers.GetRouteDetail)
+    .WithName("GetRoute")
+    .RequireAuthorization();
+
+app.MapGet("/api/routes/search", BeenThere.Web.Handlers.RouteHandlers.SearchRoutes)
+    .WithName("SearchRoutes")
+    .RequireAuthorization();
+
+app.MapPost("/api/routes/{routeId}/tags", BeenThere.Web.Handlers.RouteHandlers.UpdateRouteTags)
+    .WithName("UpdateRouteTags")
+    .RequireAuthorization()
+    .DisableAntiforgery();
+
 app.MapGet("/api/routes/geojson", BeenThere.Web.Handlers.RouteHandlers.GetRoutesGeoJson)
     .WithName("RoutesGeoJson")
     .RequireAuthorization();

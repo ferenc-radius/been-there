@@ -2,51 +2,93 @@
 
 @using BeenThere.Web.Components
 @using BeenThere.Core.Interfaces
-@using Microsoft.EntityFrameworkCore
+@using BeenThere.Core.Models
 
 <PageTitle>BeenThere — Route Library</PageTitle>
 
-<div class="max-w-7xl mx-auto px-6 py-10 space-y-6">
+<div class="max-w-5xl mx-auto px-6 sm:px-8 py-10 space-y-6">
 
-    <div class="flex items-center justify-between">
+    <!-- Header -->
+    <div class="flex items-start justify-between">
         <div>
             <h1 class="text-2xl font-bold text-slate-100">Route Library</h1>
-            <p class="text-sm text-slate-400 mt-1">Browse, filter, and analyze your imported routes.</p>
+            <p class="text-sm text-slate-400 mt-1">Browse, filter, and manage your imported routes.</p>
         </div>
-        <a href="/import"
-           class="flex items-center gap-2 rounded-lg bg-brand/90 hover:bg-brand px-4 py-2 text-sm font-medium text-white transition-colors">
-            <Icon Name="upload" Size="16" />
-            Import Route
-        </a>
-    </div>
-
-    <!-- Stats Row -->
-    <div class="grid grid-cols-3 gap-4">
-        <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
-            <p class="text-xs text-slate-500 uppercase tracking-wide">Total Routes</p>
-            <p class="text-2xl font-bold text-slate-100 mt-2">@(RouteList?.Count ?? 0)</p>
-        </div>
-        <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
-            <p class="text-xs text-slate-500 uppercase tracking-wide">Total Distance</p>
-            <p class="text-2xl font-bold text-slate-100 mt-2">@((TotalDistanceM / 1000d).ToString("F0")) km</p>
-        </div>
-        <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
-            <p class="text-xs text-slate-500 uppercase tracking-wide">Avg Distance</p>
-            <p class="text-2xl font-bold text-slate-100 mt-2">@(RouteList?.Count > 0 ? ((TotalDistanceM / RouteList.Count) / 1000d).ToString("F1") : "—") km</p>
+        <div class="flex items-center gap-2 shrink-0">
+            <button @onclick="() => isFiltersPanelOpen = !isFiltersPanelOpen"
+                    type="button"
+                    class="relative inline-flex items-center gap-2 rounded-lg border border-slate-600 px-4 py-2 text-sm font-medium text-slate-300 hover:text-slate-100 hover:border-slate-500 transition-colors">
+                <Icon Name="filter" Size="16" />
+                Filters
+                @if (GetActiveFilterCount() > 0)
+                {
+                    <span class="ml-1 inline-flex items-center justify-center min-w-5 h-5 rounded-full bg-brand text-xs font-bold text-white">
+                        @GetActiveFilterCount()
+                    </span>
+                }
+            </button>
+            <a href="/import"
+               class="inline-flex items-center gap-2 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand/80 transition-colors">
+                <Icon Name="upload" Size="15" />
+                Import
+            </a>
         </div>
     </div>
 
-    <!-- Search and Filter -->
-    <div class="rounded-lg border border-surface-border bg-surface-raised p-4">
-        <div class="flex items-center gap-2">
-            <Icon Name="search" Size="16" Class="text-slate-500" />
+    <!-- Stats row -->
+    <div class="grid grid-cols-3 gap-3">
+        <div class="rounded-lg border border-surface-border bg-surface-raised px-4 py-3 flex items-center gap-3">
+            <Icon Name="route" Size="16" Class="text-slate-500 shrink-0 block" />
+            <div>
+                <p class="text-xs text-slate-500">Routes</p>
+                <p class="text-base font-semibold text-slate-100 leading-tight">@(RouteList?.Count ?? 0)</p>
+            </div>
+        </div>
+        <div class="rounded-lg border border-surface-border bg-surface-raised px-4 py-3 flex items-center gap-3">
+            <Icon Name="activity" Size="16" Class="text-slate-500 shrink-0 block" />
+            <div>
+                <p class="text-xs text-slate-500">Total distance</p>
+                <p class="text-base font-semibold text-slate-100 leading-tight">@((TotalDistanceM / 1000d).ToString("F0")) km</p>
+            </div>
+        </div>
+        <div class="rounded-lg border border-surface-border bg-surface-raised px-4 py-3 flex items-center gap-3">
+            <Icon Name="bar-chart" Size="16" Class="text-slate-500 shrink-0 block" />
+            <div>
+                <p class="text-xs text-slate-500">Avg distance</p>
+                <p class="text-base font-semibold text-slate-100 leading-tight">@(RouteList?.Count > 0 ? ((TotalDistanceM / RouteList!.Count) / 1000d).ToString("F1") : "—") km</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search bar -->
+    <div class="rounded-lg border border-surface-border bg-surface-raised">
+        <div class="flex items-center gap-3 px-5 py-4 bg-surface-overlay/40">
+            <Icon Name="search" Size="16" Class="text-slate-400 shrink-0" />
             <input type="search"
                    @bind="searchQuery"
                    @bind:event="oninput"
                    placeholder="Search by name, mode, or date…"
-                   class="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none" />
+                   class="flex-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 outline-none" />
         </div>
     </div>
+
+    <!-- Filter Modal Component -->
+    <FilterModal IsOpen="isFiltersPanelOpen"
+                 OnOpenChanged="EventCallback.Factory.Create(this, (bool isOpen) => { isFiltersPanelOpen = isOpen; })"
+                 @bind-PlaceQuery="placeQuery"
+                 SuggestedPlaces="suggestedPlaces"
+                 SelectedPlace="selectedPlace"
+                 @bind-SelectedRadiusKm="selectedRadiusKm"
+                 IsSearchingPlaces="isSearchingPlaces"
+                 @bind-FilterTag="filterTag"
+                 @bind-FilterMinKm="filterMinKm"
+                 @bind-FilterMaxKm="filterMaxKm"
+                 IsApplying="isApplyingFilters"
+                 OnSearchPlaces="SearchPlaces"
+                 OnSelectPlace="EventCallback.Factory.Create(this, (GeocodeResult p) => SelectPlace(p))"
+                 OnClearPlace="EventCallback.Factory.Create(this, () => ClearPlace())"
+                 OnClearFilters="EventCallback.Factory.Create(this, () => ClearFilters())"
+                 OnApply="EventCallback.Factory.Create(this, () => ApplyFiltersAndClose())" />
 
     <!-- Routes Table -->
     @if (RouteList == null)
@@ -68,23 +110,153 @@
             <table class="w-full text-sm">
                 <thead class="border-b border-surface-border bg-surface-overlay">
                     <tr>
-                        <th class="px-6 py-3 text-left font-medium text-slate-300">Route Name</th>
-                        <th class="px-6 py-3 text-left font-medium text-slate-300">Date</th>
-                        <th class="px-6 py-3 text-left font-medium text-slate-300">Mode</th>
-                        <th class="px-6 py-3 text-right font-medium text-slate-300">Distance</th>
-                        <th class="px-6 py-3 text-right font-medium text-slate-300">Elev Gain</th>
+                        <th class="px-5 py-3 text-left font-medium text-slate-400">Name</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400">Date</th>
+                        <th class="px-4 py-3 text-left font-medium text-slate-400 hidden sm:table-cell">Mode</th>
+                        <th class="px-4 py-3 text-right font-medium text-slate-400">Distance</th>
+                        <th class="px-4 py-3 text-right font-medium text-slate-400 hidden md:table-cell">Elev Gain</th>
+                        <th class="px-4 py-3 w-6"></th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-surface-border">
+                <tbody>
                     @foreach (var route in FilteredRoutes)
                     {
-                        <tr class="hover:bg-surface-overlay transition-colors cursor-pointer">
-                            <td class="px-6 py-4 text-slate-200 font-medium">@route.Name</td>
-                            <td class="px-6 py-4 text-slate-400">@route.Date.ToString("MMM d, yyyy")</td>
-                            <td class="px-6 py-4 text-slate-400">@(route.Mode ?? "—")</td>
-                            <td class="px-6 py-4 text-right text-slate-400">@((route.DistanceM / 1000d).ToString("F2")) km</td>
-                            <td class="px-6 py-4 text-right text-slate-400">@((route.ElevGainM / 1000d).ToString("F1")) km</td>
+                        var isExpanded = expandedId == route.Id;
+                        <tr class="group border-t border-surface-border hover:bg-surface-overlay transition-colors cursor-pointer select-none"
+                            @onclick="() => ToggleRow(route.Id)">
+                            <td class="px-5 py-3.5 font-medium text-slate-100">@route.Name</td>
+                            <td class="px-4 py-3.5 text-slate-400 whitespace-nowrap">@route.Date.ToString("MMM d, yyyy")</td>
+                            <td class="px-4 py-3.5 text-slate-400 hidden sm:table-cell">@(route.Mode ?? "—")</td>
+                            <td class="px-4 py-3.5 text-right text-slate-400 whitespace-nowrap">@((route.DistanceM / 1000d).ToString("F1")) km</td>
+                            <td class="px-4 py-3.5 text-right text-slate-400 hidden md:table-cell whitespace-nowrap">@((route.ElevGainM).ToString("F0")) m</td>
+                            <td class="px-4 py-3.5 text-slate-500 text-right transition-transform duration-200 @(isExpanded ? "rotate-90" : "") ml-auto">
+                                <Icon Name="chevron-right" Size="15" />
+                            </td>
                         </tr>
+
+                        @if (isExpanded)
+                        {
+                            <tr class="border-t border-surface-border bg-surface-overlay/50">
+                                <td colspan="6" class="px-5 py-5">
+                                    @if (loadingDetail)
+                                    {
+                                        <p class="text-sm text-slate-500 py-4">Loading…</p>
+                                    }
+                                    else if (expandedDetail != null)
+                                    {
+                                        <div class="space-y-6">
+
+                                            <!-- Stat pills -->
+                                            <div class="flex flex-wrap gap-3">
+                                                <div class="rounded-lg border border-surface-border bg-surface-raised px-4 py-3 flex items-center gap-3">
+                                                    <Icon Name="route" Size="18" Class="text-blue-400 shrink-0" />
+                                                    <div>
+                                                        <p class="text-[10px] uppercase tracking-wider text-slate-500">Distance</p>
+                                                        <p class="text-base font-semibold text-slate-100 mt-0.5">@((expandedDetail.DistanceM / 1000d).ToString("F2")) km</p>
+                                                    </div>
+                                                </div>
+                                                <div class="rounded-lg border border-surface-border bg-surface-raised px-4 py-3 flex items-center gap-3">
+                                                    <Icon Name="activity" Size="18" Class="text-orange-400 shrink-0" />
+                                                    <div>
+                                                        <p class="text-[10px] uppercase tracking-wider text-slate-500">Elev gain</p>
+                                                        <p class="text-base font-semibold text-slate-100 mt-0.5">@((int)expandedDetail.ElevGainM) m</p>
+                                                    </div>
+                                                </div>
+                                                @{
+                                                    var elevPoints = expandedDetail.Points.Where(p => p.ElevationM.HasValue).ToList();
+                                                    if (elevPoints.Count > 0)
+                                                    {
+                                                        <div class="rounded-lg border border-surface-border bg-surface-raised px-4 py-3 flex items-center gap-3">
+                                                            <Icon Name="bar-chart" Size="18" Class="text-emerald-400 shrink-0" />
+                                                            <div>
+                                                                <p class="text-[10px] uppercase tracking-wider text-slate-500">Max elevation</p>
+                                                                <p class="text-base font-semibold text-slate-100 mt-0.5">@((int)elevPoints.Max(p => p.ElevationM!.Value)) m</p>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                }
+                                                <a href="/api/routes/@expandedDetail.Id/download"
+                                                   class="self-center ml-auto inline-flex items-center gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-md hover:shadow-lg shadow-emerald-900/30 hover:shadow-emerald-900/40 transition-all duration-150 leading-none">
+                                                    <Icon Name="download" Size="16" Class="shrink-0" />
+                                                    <span>Download GPX</span>
+                                                </a>
+                                            </div>
+
+                                            <!-- Tags -->
+                                            <div>
+                                                <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-3">Tags</p>
+                                                <div class="flex flex-wrap items-center gap-3">
+                                                    @foreach (var t in expandedTags)
+                                                    {
+                                                        var tag = t;
+                                                        <span class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-400/40 px-4 py-2 text-xs font-medium text-blue-200 hover:from-blue-500/30 hover:to-blue-600/30 hover:border-blue-400/60 transition-all duration-150">
+                                                            <span>@tag</span>
+                                                            <button @onclick:stopPropagation="true" @onclick="() => RemoveTag(tag)"
+                                                                    class="ml-1 text-blue-300/70 hover:text-blue-100 transition-colors font-bold text-sm leading-none">×</button>
+                                                        </span>
+                                                    }
+                                                    <input @bind="pendingTag"
+                                                           @bind:event="oninput"
+                                                           @onkeydown="HandleTagKeyDown"
+                                                           @onblur="CommitPendingTag"
+                                                           @onclick:stopPropagation="true"
+                                                           placeholder="+ Add tag…"
+                                                           maxlength="32"
+                                                           class="rounded-full border border-dashed border-slate-600/50 bg-transparent px-4 py-2 text-xs text-slate-300 placeholder:text-slate-500 placeholder:font-medium focus:border-blue-400/80 focus:outline-none flex-1 min-w-fit transition-all duration-150" />
+                                                    @if (tagSaveError)
+                                                    {
+                                                        <span class="text-xs text-red-400 ml-auto">Failed to save</span>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <!-- Elevation profile -->
+                                            @{
+                                                var (linePath, areaPath, minElev, maxElev) = BuildElevationPath(expandedDetail.Points);
+                                            }
+                                            @if (!string.IsNullOrEmpty(linePath))
+                                            {
+                                                <div>
+                                                    <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Elevation Profile</p>
+                                                    <div class="relative flex gap-2">
+                                                        <!-- Altitude labels -->
+                                                        <div class="flex flex-col justify-between text-[9px] text-slate-600 w-8 text-right leading-none py-0.5">
+                                                            <span>@((int)maxElev)m</span>
+                                                            <span>@((int)(minElev + (maxElev - minElev) * 0.75))m</span>
+                                                            <span>@((int)(minElev + (maxElev - minElev) * 0.5))m</span>
+                                                            <span>@((int)(minElev + (maxElev - minElev) * 0.25))m</span>
+                                                            <span>@((int)minElev)m</span>
+                                                        </div>
+                                                        <svg class="w-full rounded bg-surface-raised" style="height:120px" viewBox="0 0 1000 100" preserveAspectRatio="none">
+                                                            <defs>
+                                                                <linearGradient id="eg" x1="0" y1="0" x2="0" y2="1">
+                                                                    <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.3"/>
+                                                                    <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.02"/>
+                                                                </linearGradient>
+                                                            </defs>
+                                                            <!-- Horizontal gridlines for altitude reference -->
+                                                            <line x1="0" y1="12.5" x2="1000" y2="12.5" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <line x1="0" y1="25" x2="1000" y2="25" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <line x1="0" y1="37.5" x2="1000" y2="37.5" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <line x1="0" y1="50" x2="1000" y2="50" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <line x1="0" y1="62.5" x2="1000" y2="62.5" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <line x1="0" y1="75" x2="1000" y2="75" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <line x1="0" y1="87.5" x2="1000" y2="87.5" stroke="#475569" stroke-width="0.5" opacity="0.3" />
+                                                            <path d="@areaPath" fill="url(#eg)" stroke="none" />
+                                                            <path d="@linePath" fill="none" stroke="#60a5fa" stroke-width="1.5" vector-effect="non-scaling-stroke" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-xs text-slate-600 italic">No elevation data in this track.</p>
+                                            }
+                                        </div>
+                                    }
+                                </td>
+                            </tr>
+                        }
                     }
                 </tbody>
             </table>
@@ -94,30 +266,295 @@
 </div>
 
 @code {
-    [Inject]
-    private IRouteService RouteService { get; set; } = default!;
+    [Inject] private IRouteService RouteService { get; set; } = default!;
+    [Inject] private ICurrentUserService CurrentUserService { get; set; } = default!;
+    [Inject] private IGeocodingService GeocodingService { get; set; } = default!;
+    [Inject] private ILogger<Routes> Logger { get; set; } = default!;
 
-    [Inject]
-    private ICurrentUserService CurrentUserService { get; set; } = default!;
-
-    private List<BeenThere.Core.Domain.Route>? RouteList;
+    private List<RouteSearchResult>? RouteList;
     private double TotalDistanceM;
     private string searchQuery = string.Empty;
+
+    private string? filterTag;
+    private string? filterMinKm;
+    private string? filterMaxKm;
+
+    // Place-based search state
+    private string placeQuery = string.Empty;
+    private List<GeocodeResult>? suggestedPlaces;
+    private GeocodeResult? selectedPlace;
+    private int selectedRadiusKm = 10;
+    private bool isSearchingPlaces;
+    private CancellationTokenSource? placeSearchCts;
+
+    // Accordion state
+    private Guid? expandedId;
+    private RouteDetailDto? expandedDetail;
+    private bool loadingDetail;
+    
+    // Filter panel state
+    private bool isFiltersPanelOpen;
+    private bool isApplyingFilters; // Prevent concurrent database queries
+
+    /// <summary>
+    /// Count active filters (place, radius > default, tag, min/max km)
+    /// </summary>
+    private int GetActiveFilterCount()
+    {
+        int count = 0;
+        if (selectedPlace != null) count++;
+        if (selectedRadiusKm != 10) count++; // 10 is default
+        if (!string.IsNullOrEmpty(filterTag)) count++;
+        if (!string.IsNullOrEmpty(filterMinKm) && filterMinKm != "0") count++;
+        if (!string.IsNullOrEmpty(filterMaxKm) && filterMaxKm != "∞") count++;
+        return count;
+    }
+    private List<string> expandedTags = [];
+    private string pendingTag = string.Empty;
+    private bool tagSaveError;
 
     protected override async Task OnInitializedAsync()
     {
         var userId = CurrentUserService.UserId;
         if (string.IsNullOrEmpty(userId)) return;
 
-        RouteList = (await RouteService.GetRoutesAsync(userId)).ToList();
-        TotalDistanceM = RouteList?.Sum(r => r.DistanceM) ?? 0;
+        var routes = await RouteService.SearchRoutesAsync(userId, new RouteSearchFilter());
+        RouteList = routes.ToList();
+        TotalDistanceM = RouteList.Sum(r => r.DistanceM);
     }
 
-    private List<BeenThere.Core.Domain.Route> FilteredRoutes =>
+    private async Task ToggleRow(Guid id)
+    {
+        if (expandedId == id) { expandedId = null; expandedDetail = null; return; }
+
+        expandedId = id;
+        expandedDetail = null;
+        loadingDetail = true;
+        tagSaveError = false;
+        pendingTag = string.Empty;
+
+        var userId = CurrentUserService.UserId!;
+        expandedDetail = await RouteService.GetRouteDetailAsync(userId, id);
+        expandedTags = expandedDetail?.Tags.ToList() ?? [];
+        loadingDetail = false;
+    }
+
+    private async Task RemoveTag(string tag)
+    {
+        expandedTags.Remove(tag);
+        await PersistTags();
+    }
+
+    private async Task HandleTagKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or ",") await CommitPendingTag();
+    }
+
+    private async Task CommitPendingTag()
+    {
+        var value = pendingTag.Trim().TrimEnd(',');
+        if (string.IsNullOrEmpty(value) || expandedTags.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            pendingTag = string.Empty;
+            return;
+        }
+        expandedTags.Add(value);
+        pendingTag = string.Empty;
+        await PersistTags();
+        StateHasChanged();
+    }
+
+    private async Task PersistTags()
+    {
+        if (expandedId is null) return;
+        var ok = await RouteService.UpdateTagsAsync(CurrentUserService.UserId!, expandedId.Value, expandedTags);
+        tagSaveError = !ok;
+        if (ok && expandedDetail is not null)
+        {
+            expandedDetail = new RouteDetailDto
+            {
+                Id = expandedDetail.Id, Name = expandedDetail.Name, Date = expandedDetail.Date,
+                Mode = expandedDetail.Mode, DistanceM = expandedDetail.DistanceM,
+                ElevGainM = expandedDetail.ElevGainM, Tags = expandedTags.ToList(),
+                Notes = expandedDetail.Notes, Points = expandedDetail.Points
+            };
+        }
+    }
+
+    private async Task ApplyFilters()
+    {
+        // Prevent concurrent database queries that would cause DbContext threading issues
+        if (isApplyingFilters) return;
+        isApplyingFilters = true;
+        
+        try
+        {
+            var userId = CurrentUserService.UserId;
+            if (string.IsNullOrEmpty(userId)) return;
+
+        double? minLength = double.TryParse(filterMinKm, out var minKm) ? minKm * 1000.0 : null;
+        double? maxLength = double.TryParse(filterMaxKm, out var maxKm) ? maxKm * 1000.0 : null;
+
+        var filter = new RouteSearchFilter(
+            PlaceName: selectedPlace?.DisplayName,
+            RadiusKm: selectedRadiusKm,
+            MinLengthM: minLength,
+            MaxLengthM: maxLength,
+            Tag: string.IsNullOrWhiteSpace(filterTag) ? null : filterTag);
+
+            var results = await RouteService.SearchRoutesAsync(userId, filter);
+            RouteList = results.ToList();
+            TotalDistanceM = RouteList.Sum(r => r.DistanceM);
+            expandedId = null; expandedDetail = null;
+        }
+        finally
+        {
+            isApplyingFilters = false;
+        }
+    }
+
+    private async Task ApplyFiltersAndClose()
+    {
+        await ApplyFilters();
+        isFiltersPanelOpen = false;
+    }
+
+    private async Task ClearFilters()
+    {
+        filterTag = filterMinKm = filterMaxKm = null;
+        selectedPlace = null;
+        placeQuery = string.Empty;
+        suggestedPlaces = null;
+        selectedRadiusKm = 10;
+        expandedId = null; expandedDetail = null;
+        await OnInitializedAsync();
+    }
+
+    /// <summary>
+    /// Search for places using Nominatim geocoding service.
+    /// Debounced: only queries if at least 3 characters and 300ms have passed.
+    /// </summary>
+    private async Task SearchPlaces(ChangeEventArgs e)
+    {
+        // Update placeQuery from input event
+        placeQuery = e.Value?.ToString() ?? string.Empty;
+        suggestedPlaces = null;
+
+        // Dispose previous cancellation token source
+        placeSearchCts?.Dispose();
+        placeSearchCts = new();
+
+        if (placeQuery.Length < 3)
+        {
+            Logger.LogDebug("Place search cleared (< 3 chars): '{Query}'", placeQuery);
+            suggestedPlaces = null;
+            isSearchingPlaces = false;
+            return;
+        }
+
+        Logger.LogDebug("Starting place search for '{Query}'", placeQuery);
+        isSearchingPlaces = true;
+        try
+        {
+            // Debounce 300ms; if user continues typing, this is cancelled
+            await Task.Delay(300, placeSearchCts.Token);
+
+            // Bail if cancelled during delay (user is still typing)
+            if (placeSearchCts.Token.IsCancellationRequested)
+            {
+                Logger.LogDebug("Place search cancelled (user still typing): '{Query}'", placeQuery);
+                return;
+            }
+
+            Logger.LogDebug("Querying Nominatim for place: '{Query}'", placeQuery);
+            var results = await GeocodingService.GeocodeAsync(placeQuery, maxResults: 7, ct: placeSearchCts.Token);
+            suggestedPlaces = results.ToList();
+            Logger.LogDebug("Nominatim returned {ResultCount} results for '{Query}'", suggestedPlaces.Count, placeQuery);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected when user continues typing or navigates away
+            Logger.LogDebug("Place search cancelled (request): '{Query}'", placeQuery);
+        }
+        catch (Exception ex)
+        {
+            // Network errors, timeouts, etc. — silently fail and clear suggestions
+            Logger.LogWarning(ex, "Place search failed for '{Query}'", placeQuery);
+            suggestedPlaces = null;
+        }
+        finally
+        {
+            isSearchingPlaces = false;
+        }
+    }
+
+    private void SelectPlace(GeocodeResult place)
+    {
+        selectedPlace = place;
+        placeQuery = place.DisplayName ?? string.Empty;
+        suggestedPlaces = null;
+    }
+
+    private void ClearPlace()
+    {
+        selectedPlace = null;
+        placeQuery = string.Empty;
+        suggestedPlaces = null;
+    }
+
+    /// <summary>
+    /// Builds two SVG path strings for the elevation profile on a 1000×100 viewbox:
+    /// a stroked top line and a separate filled area below it.
+    /// Uses bucket averaging to smooth GPS elevation noise.
+    /// </summary>
+    private static (string Line, string Area, double MinElev, double MaxElev) BuildElevationPath(IReadOnlyList<RoutePointSummaryDto> points)
+    {
+        var withElev = points
+            .Where(p => p.ElevationM.HasValue)
+            .OrderBy(p => p.Idx)
+            .ToList();
+        if (withElev.Count < 2) return (string.Empty, string.Empty, 0, 0);
+
+        const int buckets = 200;
+        int n = Math.Min(buckets, withElev.Count);
+        var smoothed = new double[n];
+        for (int b = 0; b < n; b++)
+        {
+            int start = (int)Math.Round((double)b * (withElev.Count - 1) / (n - 1));
+            int end = (int)Math.Round((double)(b + 1) * (withElev.Count - 1) / (n - 1));
+            if (end >= withElev.Count) end = withElev.Count - 1;
+            if (start > end) start = end;
+            double sum = 0; int count = 0;
+            for (int i = start; i <= end; i++) { sum += withElev[i].ElevationM!.Value; count++; }
+            smoothed[b] = sum / count;
+        }
+
+        var min = smoothed.Min();
+        var max = smoothed.Max();
+        var range = Math.Max(1e-6, max - min);
+
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        var line = new System.Text.StringBuilder();
+        for (int i = 0; i < n; i++)
+        {
+            double x = (1000.0 * i) / (n - 1);
+            double y = 100 - ((smoothed[i] - min) / range * 88) - 6;
+            line.Append(i == 0
+                ? string.Format(inv, "M {0:F1} {1:F1}", x, y)
+                : string.Format(inv, " L {0:F1} {1:F1}", x, y));
+        }
+
+        var area = new System.Text.StringBuilder(line.ToString());
+        area.Append(" L 1000 100 L 0 100 Z");
+
+        return (line.ToString(), area.ToString(), min, max);
+    }
+
+    private List<RouteSearchResult> FilteredRoutes =>
         RouteList?.Where(r =>
             string.IsNullOrEmpty(searchQuery) ||
             r.Name.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ||
             (r.Mode?.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) ?? false) ||
             r.Date.ToString("MMM d, yyyy").Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
-        ).ToList() ?? new();
+        ).ToList() ?? [];
 }

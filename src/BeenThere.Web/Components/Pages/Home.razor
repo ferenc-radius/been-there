@@ -2,6 +2,7 @@
 
 @using BeenThere.Web.Components
 @using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.JSInterop
 
@@ -14,10 +15,20 @@
         <div class="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
             <Icon Name="search" Size="16" Class="text-slate-500" />
             <input type="search"
+                   @bind="searchQuery"
+                   @bind:event="oninput"
                    placeholder="Search routes…"
                    class="flex-1 bg-transparent text-sm text-slate-200 placeholder:text-slate-500 outline-none" />
-            <button class="text-slate-500 hover:text-slate-300 transition-colors" title="Filter">
+            <button @onclick="() => isFiltersPanelOpen = !isFiltersPanelOpen"
+                    class="relative text-slate-500 hover:text-slate-300 transition-colors" 
+                    title="Filter">
                 <Icon Name="filter" Size="16" />
+                @if (GetActiveFilterCount() > 0)
+                {
+                    <span class="absolute top-0 right-0 inline-flex items-center justify-center w-3 h-3 rounded-full bg-brand text-[10px] font-bold text-white leading-none">
+                        @GetActiveFilterCount()
+                    </span>
+                }
             </button>
         </div>
 
@@ -65,6 +76,24 @@
 
     </aside>
 
+    <!-- Filter Modal Component -->
+    <FilterModal IsOpen="isFiltersPanelOpen"
+                 OnOpenChanged="EventCallback.Factory.Create(this, (bool isOpen) => { isFiltersPanelOpen = isOpen; })"
+                 @bind-PlaceQuery="placeQuery"
+                 SuggestedPlaces="suggestedPlaces"
+                 SelectedPlace="selectedPlace"
+                 @bind-SelectedRadiusKm="selectedRadiusKm"
+                 IsSearchingPlaces="isSearchingPlaces"
+                 @bind-FilterTag="filterTag"
+                 @bind-FilterMinKm="filterMinKm"
+                 @bind-FilterMaxKm="filterMaxKm"
+                 IsApplying="isApplyingFilters"
+                 OnSearchPlaces="SearchPlaces"
+                 OnSelectPlace="EventCallback.Factory.Create(this, (GeocodeResult p) => SelectPlace(p))"
+                 OnClearPlace="EventCallback.Factory.Create(this, () => ClearPlace())"
+                 OnClearFilters="EventCallback.Factory.Create(this, () => ClearFilters())"
+                 OnApply="EventCallback.Factory.Create(this, () => ApplyFiltersAndClose())" />
+
     <div class="flex-1 relative bg-surface-overlay">
         <MapComponent SelectedRouteId="SelectedRouteId" />
     </div>
@@ -79,18 +108,41 @@
     private ICurrentUserService CurrentUserService { get; set; } = default!;
 
     [Inject]
+    private IGeocodingService GeocodingService { get; set; } = default!;
+
+    [Inject]
     private IJSRuntime JS { get; set; } = default!;
 
-    private List<BeenThere.Core.Domain.Route>? Routes;
+    private List<RouteSearchResult>? Routes;
     private double TotalDistanceM;
     private Guid? SelectedRouteId;
+
+    // Search
+    private string searchQuery = string.Empty;
+
+    // Filter panel state
+    private bool isFiltersPanelOpen;
+    private bool isApplyingFilters;
+
+    // Place-based search state
+    private string placeQuery = string.Empty;
+    private List<GeocodeResult>? suggestedPlaces;
+    private GeocodeResult? selectedPlace;
+    private int selectedRadiusKm = 10;
+    private bool isSearchingPlaces;
+    private CancellationTokenSource? placeSearchCts;
+
+    // Other filters
+    private string? filterTag;
+    private string? filterMinKm;
+    private string? filterMaxKm;
 
     protected override async Task OnInitializedAsync()
     {
         var userId = CurrentUserService.UserId;
         if (string.IsNullOrEmpty(userId)) return;
 
-        Routes = (await RouteService.GetRoutesAsync(userId)).ToList();
+        Routes = (await RouteService.SearchRoutesAsync(userId, new RouteSearchFilter())).ToList();
         TotalDistanceM = Routes?.Sum(r => r.DistanceM) ?? 0;
     }
 
@@ -101,33 +153,125 @@
 
     private async Task DeleteRouteWithConfirmation(Guid routeId, string routeName)
     {
-        if (!await JS.InvokeAsync<bool>("confirm", $"Delete route '{routeName}'? This cannot be undone."))
+        if (!await JS.InvokeAsync<bool>("confirm", $"Delete '{routeName}'?"))
+            return;
+
+        var userId = CurrentUserService.UserId;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        var deleted = await RouteService.DeleteRouteAsync(userId, routeId);
+        if (deleted)
         {
+            Routes?.RemoveAll(r => r.Id == routeId);
+            TotalDistanceM = Routes?.Sum(r => r.DistanceM) ?? 0;
+            if (SelectedRouteId == routeId) SelectedRouteId = null;
+            StateHasChanged();
+        }
+    }
+
+    private int GetActiveFilterCount()
+    {
+        int count = 0;
+        if (selectedPlace != null) count++;
+        if (selectedRadiusKm != 10) count++;
+        if (!string.IsNullOrEmpty(filterTag)) count++;
+        if (!string.IsNullOrEmpty(filterMinKm) && filterMinKm != "0") count++;
+        if (!string.IsNullOrEmpty(filterMaxKm) && filterMaxKm != "∞") count++;
+        return count;
+    }
+
+    private async Task SearchPlaces(ChangeEventArgs e)
+    {
+        placeQuery = e.Value?.ToString() ?? string.Empty;
+        suggestedPlaces = null;
+
+        placeSearchCts?.Dispose();
+        placeSearchCts = new();
+
+        if (placeQuery.Length < 3)
+        {
+            suggestedPlaces = null;
+            isSearchingPlaces = false;
             return;
         }
 
-        await DeleteRoute(routeId);
+        isSearchingPlaces = true;
+        try
+        {
+            await Task.Delay(300, placeSearchCts.Token);
+            if (placeSearchCts.Token.IsCancellationRequested) return;
+
+            var results = await GeocodingService.GeocodeAsync(placeQuery, maxResults: 7, ct: placeSearchCts.Token);
+            suggestedPlaces = results.ToList();
+        }
+        catch (OperationCanceledException) { }
+        catch { suggestedPlaces = null; }
+        finally
+        {
+            isSearchingPlaces = false;
+        }
     }
 
-    private async Task DeleteRoute(Guid routeId)
+    private void SelectPlace(GeocodeResult place)
     {
-        var userId = CurrentUserService.UserId;
-        if (userId is null) return;
+        selectedPlace = place;
+        placeQuery = place.DisplayName ?? string.Empty;
+        suggestedPlaces = null;
+    }
+
+    private void ClearPlace()
+    {
+        selectedPlace = null;
+        placeQuery = string.Empty;
+        suggestedPlaces = null;
+    }
+
+    private async Task ApplyFilters()
+    {
+        if (isApplyingFilters) return;
+        isApplyingFilters = true;
 
         try
         {
-            var deleted = await RouteService.DeleteRouteAsync(userId, routeId);
-            if (deleted && Routes != null)
-            {
-                Routes = Routes.Where(r => r.Id != routeId).ToList();
-                TotalDistanceM = Routes.Sum(r => r.DistanceM);
-                if (SelectedRouteId == routeId) SelectedRouteId = null;
-                StateHasChanged();
-            }
+            var userId = CurrentUserService.UserId;
+            if (string.IsNullOrEmpty(userId)) return;
+
+            double? minLength = double.TryParse(filterMinKm, out var minKm) ? minKm * 1000.0 : null;
+            double? maxLength = double.TryParse(filterMaxKm, out var maxKm) ? maxKm * 1000.0 : null;
+
+            var filter = new RouteSearchFilter(
+                PlaceName: selectedPlace?.DisplayName,
+                RadiusKm: selectedRadiusKm,
+                MinLengthM: minLength,
+                MaxLengthM: maxLength,
+                Tag: string.IsNullOrWhiteSpace(filterTag) ? null : filterTag);
+
+            var results = await RouteService.SearchRoutesAsync(userId, filter);
+            Routes = results.ToList();
+            TotalDistanceM = Routes.Sum(r => r.DistanceM);
         }
-        catch (Exception ex)
+        finally
         {
-            await JS.InvokeVoidAsync("alert", $"Error: {ex.Message}");
+            isApplyingFilters = false;
         }
+    }
+
+    private async Task ApplyFiltersAndClose()
+    {
+        await ApplyFilters();
+        isFiltersPanelOpen = false;
+    }
+
+    private async Task ClearFilters()
+    {
+        filterTag = filterMinKm = filterMaxKm = null;
+        selectedPlace = null;
+        placeQuery = string.Empty;
+        suggestedPlaces = null;
+        selectedRadiusKm = 10;
+        var userId = CurrentUserService.UserId;
+        if (string.IsNullOrEmpty(userId)) return;
+        Routes = (await RouteService.SearchRoutesAsync(userId, new RouteSearchFilter())).ToList();
+        TotalDistanceM = Routes.Sum(r => r.DistanceM);
     }
 }

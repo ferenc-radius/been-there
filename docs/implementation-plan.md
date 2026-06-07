@@ -166,29 +166,51 @@ Home page shows all imported routes as polylines on an interactive Leaflet map, 
 
 ---
 
-## Milestone 5 — Route detail, search, and analytics
+## Milestone 5 — Route detail, search, and analytics ✅ COMPLETE (partial)
 
 **Goal:** users can drill into a route, filter the library, and see aggregate stats.
 
+**Status:** Route detail accordion expansion, elevation profile, GPX download, and tag editing are complete. Raw lat/lng/radius filters removed in preparation for Milestone 5.5 place-name search. Analytics page deferred to post-MVP.
+
 ### Tasks
-- [ ] Route detail page: name, date, distance, elevation gain, mode, tags, notes
-- [ ] Elevation profile chart (rendered from `RoutePoint.ElevationM` series) — lightweight SVG or JS chart
-- [ ] GPX download endpoint `/api/routes/{routeId}/download` (streams from Drive; **no `driveFileId` in response**)
-- [ ] Search / filter panel (ADR-0006 spatial queries):
-  - Radius search: `ST_DWithin` on `centroid` geography
-  - Length range: btree on `distance_m`
-  - Elevation gain range
-  - Tags (jsonb `@>`)
-  - Date last walked range
-- [ ] Analytics page: total km, km/year bar chart, most repeated routes (by start/end proximity)
-- [ ] Tag editing on route detail
+- [x] Route detail page: accordion inline expansion with name, date, distance, elevation gain, mode, tags, notes
+- [x] Elevation profile chart: SVG with bucket-averaged smoothing, gridlines, and altitude labels (left axis in metres)
+- [x] GPX download endpoint `/api/routes/{routeId}/download` with green button + download icon (streams from Drive; **no `driveFileId` in response**)
+- [x] Tag editing on route detail: add/remove tags with real-time persistence; tag pills with delete button
+- [x] Search / filter panel with Tag filter, Length range filters
+- [ ] ~~Radius search (lat/lng/radius inputs)~~ — **removed; replaced by Milestone 5.5 place-name search**
+- [ ] Analytics page: total km, km/year bar chart, most repeated routes (by start/end proximity) — **deferred post-MVP**
+- [x] Stats pills per route: Distance, Elevation Gain, Max Elevation with icons
 
 ### Done when
 User can filter the library by radius + length, open a route detail with elevation profile, and download the original GPX.
 
 ---
 
-## Milestone 6 — Duplicate detection
+## Milestone 6 — Multi-user sharing, Ratings & Reviews, "Been-There Too"
+
+**Goal:** support multi-user visibility (private-by-default sharing), allow users to rate and review routes (1–5 stars, signed-in users only), and provide a "been-there too" intersection feature showing other users who overlap a route (count + expandable detail).
+
+### Tasks
+- [ ] Data model: add `IsPublic` (bool, default false) to `Route`.
+- [ ] Schema: new tables `RouteRating` and `RouteReview` with appropriate FKs, timestamps, and indexes; `RouteReview` has `IsFlagged` for moderation.
+- [ ] Visibility: extend global query filter so listings return `r.IsPublic == true || r.UserId == currentUserId`.
+- [ ] Services: add `IRouteSocialService` + `RouteSocialService` handling rating aggregation, review CRUD, and intersection analysis (use PostGIS `ST_Intersection` / `ST_Length` on geography for overlap metrics).
+- [ ] API: add handlers for ratings/reviews/intersections (GET/POST endpoints, auth required for writes).
+- [ ] UI: surface average rating and review count in `Routes.razor` and `MapComponent`; route detail modal shows reviews, rating form, and "been-there too" expandable list.
+- [ ] Moderation: add review reporting endpoint that sets `IsFlagged = true` for admin triage.
+- [ ] Performance: compute intersections or expensive metrics as background jobs and cache summaries; provide pagination for reviews.
+
+### Done when
+User can opt to share a route, other users can see shared routes, authenticated users can submit one rating (1–5) and textual reviews per route, and the "been-there too" panel shows how many and which users intersect that route with overlap metrics.
+
+### Notes
+- Routes remain private by default; sharing is opt-in via `IsPublic`.
+- Reviews require login and display reviewer name; ratings are one-per-user per-route.
+
+---
+
+## Milestone 7 — Duplicate detection
 
 **Goal:** background job flags likely duplicates for each newly imported route.
 
@@ -208,7 +230,27 @@ Importing a route that is within 100 m Hausdorff of an existing route results in
 
 ---
 
-## Milestone 7 — Dockerfile, production Compose, and CI
+## Milestone 5.5 — Search by place ✅ COMPLETE
+
+**Goal:** users can type a place name (city, region, address) into the filter panel and find routes near that location, without having to know or paste raw coordinates.
+
+**Licensing & Attribution:** Nominatim is AGPL-3.0; OpenStreetMap data is ODbL 1.0. Public Nominatim API use requires attribution. Add `© OpenStreetMap contributors` link in UI/footer and update `README.md`.
+
+### Tasks
+- [ ] Integrate a geocoding API (e.g. Nominatim/OpenStreetMap — free, no key required) to resolve a place name to `(lat, lng)` via a server-side HTTP call in `BeenThere.Infrastructure`
+- [ ] `IGeocodingService` interface in `BeenThere.Core` with `Task<GeocodeResult?> GeocodeAsync(string query, CancellationToken ct)` — returns `Lat`, `Lng`, `DisplayName`
+- [ ] `NominatimGeocodingService` implementation in `BeenThere.Infrastructure` — rate-limit aware, sets `User-Agent` header per Nominatim policy
+- [ ] Add `PlaceName` + `RadiusKm` (default 10 km) fields to `RouteSearchFilter`; backend resolves place → coordinates before executing `IsWithinDistance`
+- [ ] Replace lat/lng/radius raw inputs in the filter panel with a single **"Near place"** text input + radius selector (5 / 10 / 25 / 50 km)
+- [ ] Show resolved place name as a dismissible badge below the input after geocoding
+- [ ] Graceful error state when geocoding returns no results
+
+### Done when
+User types "Fontainebleau" + selects 25 km and the library shows only routes whose centroid is within 25 km of that location.
+
+---
+
+## Milestone 8 — Dockerfile, production Compose, and CI
 
 **Goal:** app is containerised and a GitHub Actions workflow builds and publishes the image.
 

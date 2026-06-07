@@ -1,0 +1,263 @@
+@using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
+
+<div>
+    <!-- Filter modal overlay -->
+    @if (IsOpen)
+    {
+        <div class="fixed inset-0 bg-black/50 z-[9998]" @onclick="Close"></div>
+    }
+
+    <!-- Filter modal dialog -->
+    @if (IsOpen)
+    {
+        <div class="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-xl bg-surface-raised border border-surface-border rounded-lg shadow-2xl z-[9999] max-h-[90vh] overflow-y-auto">
+            <!-- Panel header -->
+            <div class="border-b border-surface-border px-6 py-4 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-100">Filters</h2>
+                <button @onclick="Close"
+                        type="button"
+                        class="p-1 rounded-lg hover:bg-surface-overlay text-slate-400 hover:text-slate-200 transition-colors">
+                    <Icon Name="x" Size="20" />
+                </button>
+            </div>
+
+            <!-- Panel content -->
+            <div class="px-6 py-4 flex flex-col gap-[25px]">
+                <!-- Near place search -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-slate-400">Near place</label>
+                    
+                    @if (SelectedPlace == null)
+                    {
+                        <div class="relative z-20">
+                            <div class="relative rounded-lg border border-surface-border bg-surface-overlay focus-within:border-brand focus-within:ring-1 focus-within:ring-brand/30 transition-all">
+                                <input type="text"
+                                       value="@PlaceQuery"
+                                       @oninput="OnPlaceQueryInput"
+                                       placeholder="Search location…"
+                                       autocomplete="off"
+                                       class="w-full bg-transparent px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 outline-none" />
+                            </div>
+
+                            <!-- Autocomplete suggestions dropdown -->
+                            @if (!string.IsNullOrEmpty(PlaceQuery) && PlaceQuery.Length >= 3 && SuggestedPlaces != null)
+                            {
+                                <div class="absolute top-full left-0 right-0 mt-1 rounded-lg border border-surface-border bg-surface-raised shadow-lg z-50 w-full">
+                                    @if (IsSearchingPlaces)
+                                    {
+                                        <div class="px-4 py-3 text-sm text-slate-300 flex items-center gap-3">
+                                            <div class="animate-spin h-4 w-4 border-2 border-brand border-t-transparent rounded-full"></div>
+                                            <span class="font-medium">Searching locations…</span>
+                                        </div>
+                                    }
+                                    else if (SuggestedPlaces?.Count > 0)
+                                    {
+                                        <ul class="max-h-56 overflow-y-auto">
+                                            @foreach (var place in SuggestedPlaces)
+                                            {
+                                                <li class="border-b border-surface-border/30 last:border-b-0">
+                                                    <button type="button"
+                                                            @onclick="async () => await OnSelectPlace.InvokeAsync(place)"
+                                                            class="w-full px-4 py-3 text-left text-sm text-slate-200 hover:bg-surface-overlay/50 transition-colors flex items-start gap-2">
+                                                        <Icon Name="map-pin" Size="13" Class="text-brand mt-0.5 shrink-0" />
+                                                        <div class="flex-1 min-w-0">
+                                                            <div class="font-medium text-slate-100 break-words">
+                                                                @(place.DisplayName ?? $"({place.Lat:F3}, {place.Lng:F3})")
+                                                            </div>
+                                                            @if (place.Importance.HasValue)
+                                                            {
+                                                                <div class="text-xs text-slate-500 mt-0.5">
+                                                                    @((place.Importance.Value * 100).ToString("F0"))% relevance
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </button>
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                    else if (SuggestedPlaces?.Count == 0)
+                                    {
+                                        <div class="px-4 py-3 text-sm text-slate-400">
+                                            No locations found
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Selected place chip -->
+                        <div class="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500/20 to-blue-600/20 border border-blue-400/40 px-4 py-2 text-xs font-medium text-blue-200 hover:from-blue-500/30 hover:to-blue-600/30 hover:border-blue-400/60 transition-all duration-150 max-w-full">
+                            <Icon Name="map-pin" Size="13" Class="shrink-0" />
+                            <span class="truncate">@(SelectedPlace.DisplayName ?? $"({SelectedPlace.Lat:F3}, {SelectedPlace.Lng:F3})")</span>
+                            <button @onclick="OnClearPlace"
+                                    type="button"
+                                    class="ml-1 text-blue-300/70 hover:text-blue-100 transition-colors font-bold text-sm leading-none">
+                                ×
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <!-- Radius selector (only enabled when place selected) -->
+                <div class="flex flex-col gap-1.5" style="opacity: @(SelectedPlace != null ? 1 : 0.5); pointer-events: @(SelectedPlace != null ? "auto" : "none");">
+                    <label class="text-xs font-medium text-slate-400">Radius</label>
+                    <select value="@SelectedRadiusKm" @onchange="OnRadiusChanged" disabled="@(SelectedPlace == null)"
+                            class="w-full rounded-md border border-surface-border bg-surface-overlay px-3.5 py-2.5 text-sm text-slate-200 focus:border-brand focus:outline-none hover:border-surface-border/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <option value="5">5 km</option>
+                        <option value="10">10 km</option>
+                        <option value="25">25 km</option>
+                        <option value="50">50 km</option>
+                        <option value="75">75 km</option>
+                        <option value="100">100 km</option>
+                        <option value="150">150 km</option>
+                        <option value="250">250 km</option>
+                        <option value="500">500 km</option>
+                        <option value="1000">1000 km</option>
+                    </select>
+                </div>
+
+                <!-- Min km -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-slate-400">Min km</label>
+                    <input type="number" min="0" step="0.1" value="@FilterMinKm" @oninput="OnMinKmInput" placeholder="0"
+                           class="w-full rounded-md border border-surface-border bg-surface-overlay px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-brand focus:outline-none" />
+                </div>
+
+                <!-- Max km -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-slate-400">Max km</label>
+                    <input type="number" min="0" step="0.1" value="@FilterMaxKm" @oninput="OnMaxKmInput" placeholder="∞"
+                           class="w-full rounded-md border border-surface-border bg-surface-overlay px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-brand focus:outline-none" />
+                </div>
+
+                <!-- Tag filter -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-medium text-slate-400">Tag</label>
+                    <input type="text" value="@FilterTag" @oninput="OnTagInput" placeholder="e.g. hiking"
+                           class="w-full rounded-md border border-surface-border bg-surface-overlay px-3.5 py-2.5 text-sm text-slate-200 placeholder:text-slate-600 focus:border-brand focus:outline-none" />
+                </div>
+            </div>
+
+            <!-- Panel footer -->
+            <div class="border-t border-surface-border px-6 py-4 flex items-center gap-2">
+                <button @onclick="OnClearFilters"
+                        class="flex-1 rounded-lg border border-surface-border px-4 py-2.5 text-sm font-medium text-slate-300 hover:border-slate-500 hover:text-slate-100 transition-colors">
+                    Clear
+                </button>
+                <button @onclick="OnApply"
+                        disabled="@IsApplying"
+                        class="flex-1 rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand/85 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                    @(IsApplying ? "Searching…" : "Apply")
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public bool IsOpen { get; set; }
+
+    [Parameter]
+    public EventCallback<bool> OnOpenChanged { get; set; }
+
+    [Parameter]
+    public string? PlaceQuery { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> PlaceQueryChanged { get; set; }
+
+    [Parameter]
+    public List<GeocodeResult>? SuggestedPlaces { get; set; }
+
+    [Parameter]
+    public GeocodeResult? SelectedPlace { get; set; }
+
+    [Parameter]
+    public int SelectedRadiusKm { get; set; } = 10;
+
+    [Parameter]
+    public EventCallback<int> SelectedRadiusKmChanged { get; set; }
+
+    [Parameter]
+    public bool IsSearchingPlaces { get; set; }
+
+    [Parameter]
+    public string? FilterTag { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FilterTagChanged { get; set; }
+
+    [Parameter]
+    public string? FilterMinKm { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FilterMinKmChanged { get; set; }
+
+    [Parameter]
+    public string? FilterMaxKm { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FilterMaxKmChanged { get; set; }
+
+    [Parameter]
+    public bool IsApplying { get; set; }
+
+    [Parameter]
+    public EventCallback<ChangeEventArgs> OnSearchPlaces { get; set; }
+
+    [Parameter]
+    public EventCallback<GeocodeResult> OnSelectPlace { get; set; }
+
+    [Parameter]
+    public EventCallback OnClearPlace { get; set; }
+
+    [Parameter]
+    public EventCallback OnClearFilters { get; set; }
+
+    [Parameter]
+    public EventCallback OnApply { get; set; }
+
+    private async Task Close()
+    {
+        await OnOpenChanged.InvokeAsync(false);
+    }
+
+    private async Task OnPlaceQueryInput(ChangeEventArgs e)
+    {
+        PlaceQuery = e.Value?.ToString();
+        await PlaceQueryChanged.InvokeAsync(PlaceQuery);
+        await OnSearchPlaces.InvokeAsync(e);
+    }
+
+    private async Task OnRadiusChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var radius))
+        {
+            SelectedRadiusKm = radius;
+            await SelectedRadiusKmChanged.InvokeAsync(radius);
+        }
+    }
+
+    private async Task OnTagInput(ChangeEventArgs e)
+    {
+        FilterTag = e.Value?.ToString();
+        await FilterTagChanged.InvokeAsync(FilterTag);
+    }
+
+    private async Task OnMinKmInput(ChangeEventArgs e)
+    {
+        FilterMinKm = e.Value?.ToString();
+        await FilterMinKmChanged.InvokeAsync(FilterMinKm);
+    }
+
+    private async Task OnMaxKmInput(ChangeEventArgs e)
+    {
+        FilterMaxKm = e.Value?.ToString();
+        await FilterMaxKmChanged.InvokeAsync(FilterMaxKm);
+    }
+}

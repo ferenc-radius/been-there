@@ -191,6 +191,15 @@ docker run -e GOOGLE_CLIENT_ID=<id> -e GOOGLE_CLIENT_SECRET=<secret> -p 443:8080
 4. Commit with descriptive message
 5. Push and open a pull request
 
+## Attribution
+
+This application uses the following third-party services and data:
+
+- **[Nominatim](https://nominatim.openstreetmap.org/)** - Geocoding service powered by OpenStreetMap
+  - Software: AGPL-3.0 License
+  - Data: ODbL 1.0 License (© OpenStreetMap contributors)
+  - Usage Policy: See [Nominatim Usage Policy](https://nominatim.org/policies/usage-policy.html)
+
 ## License
 
 See [LICENSE](LICENSE) file for details.

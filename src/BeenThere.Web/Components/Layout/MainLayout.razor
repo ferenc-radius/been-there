@@ -1,12 +1,23 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="flex h-screen w-screen overflow-hidden bg-surface text-slate-100">
+<div class="flex h-screen w-screen overflow-hidden bg-surface text-slate-100 flex-col">
 
-    <NavMenu />
+    <div class="flex flex-1 overflow-hidden min-w-0">
+        <NavMenu />
+        <main class="flex-1 overflow-auto min-w-0">
+            @Body
+        </main>
+    </div>
 
-    <main class="flex-1 overflow-auto min-w-0">
-        @Body
-    </main>
+    <!-- Footer with attributions -->
+    <footer class="border-t border-surface-border bg-surface-overlay/30 px-6 py-3 text-xs text-slate-500 flex items-center justify-between">
+        <span>© 2024–2026 BeenThere</span>
+        <div class="flex gap-4">
+            <a href="https://nominatim.openstreetmap.org/ui/about.html" target="_blank" class="hover:text-slate-300 transition-colors underline">
+                Nominatim / OpenStreetMap
+            </a>
+        </div>
+    </footer>
 
 </div>
 

@@ -1,9 +1,9 @@
 using BeenThere.Core.Exceptions;
 using BeenThere.Core.Interfaces;
+using BeenThere.Core.Models;
 using BeenThere.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using NetTopologySuite.Geometries;
-using System.Linq;
 
 namespace BeenThere.Web.Handlers;
 
@@ -35,6 +35,7 @@ internal static class RouteHandlers
         }
     }
 
+    /// <summary>Serves routes as GeoJSON for the Leaflet map (ADR-0007).</summary>
     internal static async Task<IResult> GetRoutesGeoJson(ApplicationDbContext db)
     {
         var routes = await db.Routes.AsNoTracking()
@@ -57,22 +58,74 @@ internal static class RouteHandlers
         return Results.Json(fc);
     }
 
-    internal static async Task<IResult> DeleteRoute(
+    internal static async Task<IResult> GetRouteDetail(
         Guid routeId,
-        ApplicationDbContext db,
-        ICurrentUserService currentUser)
+        HttpContext context,
+        ICurrentUserService currentUser,
+        IRouteService routeService)
     {
         var userId = currentUser.UserId!;
+        var detail = await routeService.GetRouteDetailAsync(userId, routeId, context.RequestAborted);
+        return detail is null ? Results.NotFound() : Results.Json(detail);
+    }
 
-        var route = await db.Routes.FirstOrDefaultAsync(r => r.Id == routeId && r.UserId == userId);
-        if (route == null)
-        {
-            return Results.NotFound();
-        }
+    internal static async Task<IResult> SearchRoutes(
+        double? lat,
+        double? lng,
+        double? radiusMetres,
+        string? placeName,
+        int radiusKm,
+        double? minLengthM,
+        double? maxLengthM,
+        string? tag,
+        DateTimeOffset? startDate,
+        DateTimeOffset? endDate,
+        HttpContext context,
+        ICurrentUserService currentUser,
+        IRouteService routeService)
+    {
+        var userId = currentUser.UserId!;
+        var filter = new RouteSearchFilter(
+            Lat: lat,
+            Lng: lng,
+            RadiusMetres: radiusMetres,
+            PlaceName: placeName,
+            RadiusKm: radiusKm == 0 ? 10 : radiusKm,
+            MinLengthM: minLengthM,
+            MaxLengthM: maxLengthM,
+            Tag: tag,
+            StartDate: startDate,
+            EndDate: endDate);
+        var results = await routeService.SearchRoutesAsync(userId, filter, context.RequestAborted);
+        return Results.Json(results);
+    }
 
-        db.Routes.Remove(route);
-        await db.SaveChangesAsync();
+    internal static async Task<IResult> UpdateRouteTags(
+        Guid routeId,
+        TagUpdateDto dto,
+        HttpContext context,
+        ICurrentUserService currentUser,
+        IRouteService routeService)
+    {
+        var userId = currentUser.UserId!;
+        var tags = dto.Tags ?? [];
+        var updated = await routeService.UpdateTagsAsync(userId, routeId, tags, context.RequestAborted);
+        return updated ? Results.Ok(new { routeId, tags }) : Results.NotFound();
+    }
 
-        return Results.Ok();
+    internal sealed class TagUpdateDto
+    {
+        public List<string>? Tags { get; set; }
+    }
+
+    internal static async Task<IResult> DeleteRoute(
+        Guid routeId,
+        HttpContext context,
+        ICurrentUserService currentUser,
+        IRouteService routeService)
+    {
+        var userId = currentUser.UserId!;
+        var deleted = await routeService.DeleteRouteAsync(userId, routeId, context.RequestAborted);
+        return deleted ? Results.Ok() : Results.NotFound();
     }
 }

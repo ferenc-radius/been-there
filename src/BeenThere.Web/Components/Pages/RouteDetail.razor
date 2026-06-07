@@ -1,0 +1,209 @@
+@page "/routes/{routeId:guid}"
+
+@using BeenThere.Core.Interfaces
+@using BeenThere.Core.Models
+@inject IRouteService RouteService
+@inject ICurrentUserService CurrentUserService
+@inject NavigationManager Navigation
+
+<div class="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-5">
+
+    <a href="/routes" class="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200 transition-colors">
+        <Icon Name="chevron-left" Size="14" />
+        Back to library
+    </a>
+
+    @if (route == null)
+    {
+        <div class="rounded-xl border border-surface-border bg-surface-raised p-10 text-center">
+            <p class="text-slate-500">Loading route…</p>
+        </div>
+    }
+    else
+    {
+        <!-- Header card -->
+        <div class="rounded-xl border border-surface-border bg-surface-raised p-6 space-y-5">
+
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <h1 class="text-xl font-bold text-slate-100 leading-snug">@route.Name</h1>
+                    <p class="text-sm text-slate-400 mt-0.5">
+                        @route.Date.ToString("dddd, MMM d, yyyy")
+                        @if (!string.IsNullOrEmpty(route.Mode)) { <span class="before:content-['·'] before:mx-1.5">@route.Mode</span> }
+                    </p>
+                </div>
+                <a href="/api/routes/@route.Id/download"
+                   class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-surface-border px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-brand hover:text-brand transition-colors">
+                    <Icon Name="download" Size="13" />
+                    Download GPX
+                </a>
+            </div>
+
+            <!-- Stat pills -->
+            <div class="flex flex-wrap gap-2">
+                <div class="rounded-lg bg-surface-overlay border border-surface-border px-4 py-2.5 min-w-[90px]">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Distance</p>
+                    <p class="text-base font-semibold text-slate-100">@((route.DistanceM / 1000d).ToString("F2")) km</p>
+                </div>
+                <div class="rounded-lg bg-surface-overlay border border-surface-border px-4 py-2.5 min-w-[90px]">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Elev gain</p>
+                    <p class="text-base font-semibold text-slate-100">@((int)route.ElevGainM) m</p>
+                </div>
+                @if (HasElevationData)
+                {
+                    var maxElev = route.Points.Where(p => p.ElevationM.HasValue).Max(p => p.ElevationM!.Value);
+                    <div class="rounded-lg bg-surface-overlay border border-surface-border px-4 py-2.5 min-w-[90px]">
+                        <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-0.5">Max elevation</p>
+                        <p class="text-base font-semibold text-slate-100">@((int)maxElev) m</p>
+                    </div>
+                }
+            </div>
+
+            <!-- Tags -->
+            <div>
+                <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-2">Tags</p>
+                <div class="flex flex-wrap items-center gap-2">
+                    @foreach (var t in editableTags)
+                    {
+                        var tag = t;
+                        <span class="inline-flex items-center gap-1 rounded-full bg-surface-overlay border border-surface-border px-3 py-1 text-xs font-medium text-slate-300">
+                            @tag
+                            <button @onclick="() => RemoveTag(tag)"
+                                    class="ml-0.5 text-slate-500 hover:text-slate-100 transition-colors leading-none">×</button>
+                        </span>
+                    }
+                    <input @bind="pendingTag"
+                           @bind:event="oninput"
+                           @onkeydown="HandleTagKeyDown"
+                           @onblur="CommitPendingTag"
+                           placeholder="Add tag…"
+                           maxlength="32"
+                           class="rounded-full border border-dashed border-surface-border bg-transparent px-3 py-1 text-xs text-slate-400 placeholder:text-slate-600 focus:border-brand focus:text-slate-200 focus:outline-none w-24 transition-colors" />
+                    @if (tagSaveError)
+                    {
+                        <span class="text-xs text-red-400">Failed to save</span>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Elevation profile -->
+        <div class="rounded-xl border border-surface-border bg-surface-raised p-6">
+            <p class="text-[10px] uppercase tracking-wider text-slate-500 mb-4">Elevation Profile</p>
+            @if (!HasElevationData)
+            {
+                <p class="text-slate-500 text-sm py-6 text-center">No elevation data in this track.</p>
+            }
+            else
+            {
+                <svg class="w-full rounded" style="height:160px" viewBox="0 0 100 40" preserveAspectRatio="none">
+                    <defs>
+                        <linearGradient id="elev-fill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.25"/>
+                            <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.02"/>
+                        </linearGradient>
+                    </defs>
+                    <polygon fill="url(#elev-fill)" points="@FillPoints" />
+                    <polyline fill="none" stroke="#60a5fa" stroke-width="0.5" points="@PolylinePoints" />
+                </svg>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public Guid routeId { get; set; }
+
+    private RouteDetailDto? route;
+    private List<string> editableTags = [];
+    private string pendingTag = string.Empty;
+    private bool tagSaveError;
+
+    private bool HasElevationData => route?.Points.Any(p => p.ElevationM.HasValue) ?? false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var userId = CurrentUserService.UserId;
+        if (string.IsNullOrEmpty(userId)) return;
+
+        route = await RouteService.GetRouteDetailAsync(userId, routeId);
+        editableTags = route?.Tags.ToList() ?? [];
+    }
+
+    private async Task RemoveTag(string tag)
+    {
+        editableTags.Remove(tag);
+        await PersistTags();
+    }
+
+    private async Task HandleTagKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or ",")
+            await CommitPendingTag();
+    }
+
+    private async Task CommitPendingTag()
+    {
+        var value = pendingTag.Trim().TrimEnd(',');
+        if (string.IsNullOrEmpty(value) || editableTags.Contains(value, StringComparer.OrdinalIgnoreCase))
+        {
+            pendingTag = string.Empty;
+            return;
+        }
+        editableTags.Add(value);
+        pendingTag = string.Empty;
+        await PersistTags();
+    }
+
+    private async Task PersistTags()
+    {
+        var userId = CurrentUserService.UserId!;
+        var ok = await RouteService.UpdateTagsAsync(userId, routeId, editableTags);
+        tagSaveError = !ok;
+        if (ok && route is not null)
+        {
+            route = new RouteDetailDto
+            {
+                Id = route.Id, Name = route.Name, Date = route.Date, Mode = route.Mode,
+                DistanceM = route.DistanceM, ElevGainM = route.ElevGainM,
+                Tags = editableTags.ToList(), Notes = route.Notes, Points = route.Points
+            };
+        }
+    }
+
+    private string FillPoints => PolylinePoints.Length > 0 ? PolylinePoints + " 100,40 0,40" : string.Empty;
+
+    private string PolylinePoints
+    {
+        get
+        {
+            if (route?.Points == null || route.Points.Count == 0) return string.Empty;
+
+            // Only use points that actually have elevation data — nulls collapse to 0 and cause wild zigzags
+            var withElevation = route.Points.Where(p => p.ElevationM.HasValue).ToList();
+            if (withElevation.Count < 2) return string.Empty;
+
+            // Downsample: no benefit rendering more points than the SVG coordinate space
+            const int maxPoints = 300;
+            IEnumerable<RoutePointSummaryDto> sampled = withElevation.Count <= maxPoints
+                ? withElevation
+                : Enumerable.Range(0, maxPoints)
+                    .Select(i => withElevation[(int)Math.Round((double)i * (withElevation.Count - 1) / (maxPoints - 1))]);
+
+            var elevations = sampled.Select(p => p.ElevationM!.Value).ToList();
+            var min = elevations.Min();
+            var max = elevations.Max();
+            var range = Math.Max(1e-6, max - min);
+            var count = elevations.Count;
+            var points = new List<string>(count);
+            for (int i = 0; i < count; i++)
+            {
+                var x = (100.0 * i) / (count - 1);
+                var y = 40 - ((elevations[i] - min) / range * 36.0); // 2px top + 2px bottom margin
+                points.Add($"{x:F2},{y:F2}");
+            }
+            return string.Join(' ', points);
+        }
+    }
+}
