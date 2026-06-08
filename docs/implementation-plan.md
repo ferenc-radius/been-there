@@ -1,6 +1,6 @@
 # BeenThere — Implementation Plan
 
-> Last updated: 2026-06-06  
+> Last updated: 2026-06-07  
 > Status: Ready to execute — all architectural decisions resolved (ADR-0001 through ADR-0010)
 
 ---
@@ -211,7 +211,86 @@ All users can see all routes, authenticated users can submit one rating (1–5) 
 
 ---
 
-## Milestone 7 — Duplicate detection
+## Milestone 7 — Route Photos ("proof you were there")
+
+**Goal:** owners can attach multiple photos from Google Photos to a route as evidence they were there. Photos are displayed as a strip on the route detail page and as pin markers on the route map. GPS coordinates are extracted from the photo's EXIF data at attach time and stored permanently.
+
+### Design decisions
+- **Photo source:** Google Photos Picker API — user explicitly selects photos; no auto-matching.
+- **GPS acquisition:** server downloads the original photo bytes via `baseUrl=d` immediately after the user picks (baseUrl expires ~60 min), extracts EXIF `GPSLatitude`/`GPSLongitude` using `MetadataExtractor` (NuGet), then discards the bytes. Coordinates stored permanently — no re-download needed later.
+- **No GPS graceful fallback:** photos without GPS EXIF (location disabled on phone) are attached without coordinates; shown in the strip but not as a map pin.
+- **Multi-select:** user can pick multiple photos in a single Picker session.
+- **Visibility:** owner-only for now (public display deferred).
+- **Storage:** `route_photos` table — no raw image bytes stored, only metadata + thumbnail URL.
+- **baseUrl refresh:** thumbnail `baseUrl` expires; store `url_expires_at` and re-fetch from Google Photos Picker on expiry (owner-triggered re-auth flow).
+
+### Tasks
+
+#### Domain & persistence
+- [ ] `RoutePhoto` entity in `BeenThere.Core/Domain/`:
+  - `Id` (Guid), `RouteId` (FK), `UserId`, `MediaItemId` (string — Google Photos persistent ID)
+  - `ThumbnailUrl` (string), `UrlExpiresAt` (DateTimeOffset) — baseUrl for display; refresh on expiry
+  - `Lat` (double?), `Lon` (double?) — from EXIF, null if not available
+  - `CreatedAt`, `UpdatedAt`
+- [ ] `RoutePhotoDto` in `BeenThere.Core/Models/` — `Id`, `ThumbnailUrl`, `Lat?`, `Lon?`, `UrlExpiresAt`
+- [ ] `RoutePhotoConfiguration` in `BeenThere.Infrastructure/Persistence/Configurations/` — table `route_photos`, unique index on `(route_id, media_item_id)`, cascade delete on route
+- [ ] Add `ICollection<RoutePhoto> Photos` navigation to `Route` entity
+- [ ] Add `DbSet<RoutePhoto> RoutePhotos` to `ApplicationDbContext`
+- [ ] EF Core migration `AddRoutePhotos`
+- [ ] Add `MetadataExtractor` NuGet package to `Directory.Packages.props` and `BeenThere.Infrastructure.csproj`
+
+#### Service layer
+- [ ] `IRoutePhotoService` interface in `BeenThere.Core/Interfaces/`:
+  - `Task<List<RoutePhotoDto>> GetPhotosForRouteAsync(Guid routeId, CancellationToken ct)`
+  - `Task<RoutePhotoDto> AttachPhotoAsync(Guid routeId, string mediaItemId, string baseUrl, CancellationToken ct)` — downloads bytes, extracts EXIF, stores metadata, discards bytes
+  - `Task DeletePhotoAsync(Guid photoId, CancellationToken ct)` — owner only
+  - `Task<List<RoutePhotoDto>> RefreshExpiredUrlsAsync(Guid routeId, string[] freshBaseUrls, CancellationToken ct)` — called when thumbnails have expired
+- [ ] `RoutePhotoService` implementation in `BeenThere.Infrastructure/Services/`:
+  - Downloads `{baseUrl}=d` using `HttpClient` (scoped, authenticated with current user's Google access token)
+  - Extracts GPS via `MetadataExtractor.ImageMetadataReader.ReadMetadata(stream)` → `GpsDirectory`
+  - Stores `ThumbnailUrl` as `{baseUrl}=w400-h400` (fixed-size thumbnail param); sets `UrlExpiresAt = UtcNow + 50min` (conservative — actual expiry ~60 min)
+  - Enforces ownership check on delete
+- [ ] Register `IRoutePhotoService` as `Scoped` in `InfrastructureServiceExtensions`
+
+#### API
+- [ ] `PhotoHandlers.cs` in `BeenThere.Web/Handlers/`:
+  - `GET /api/routes/{routeId}/photos` — returns `List<RoutePhotoDto>` (owner only for now)
+  - `POST /api/routes/{routeId}/photos` — body: `{ mediaItemId, baseUrl }[]` (array for multi-select); calls `AttachPhotoAsync` for each; `RequireAuthorization`, `DisableAntiforgery`
+  - `DELETE /api/photos/{photoId}` — owner only; `RequireAuthorization`, `DisableAntiforgery`
+  - `POST /api/routes/{routeId}/photos/refresh` — body: `{ photoId, freshBaseUrl }[]` — called by UI when thumbnails have expired
+- [ ] Register all four endpoints in `Program.cs`
+
+#### Google Photos Picker integration
+- [ ] Add `https://www.googleapis.com/auth/photospicker.mediaitems.readonly` scope to `AuthSetup.cs` Google options — **requires user re-consent on next sign-in**
+- [ ] `photos-picker-interop.js` module in `wwwroot/js/` (separate from `map-interop.js` per ADR-0007 isolation principle):
+  - `openPicker(dotNetRef, callbackMethod)` — opens Google Photos Picker in an iframe/popup
+  - Returns selected `{ id, baseUrl }[]` array to the Blazor component via `dotNetRef.invokeMethodAsync`
+  - Picker session token obtained via `POST https://photospicker.googleapis.com/v1/sessions` using current user's access token (passed from Blazor)
+  - Polls `GET https://photospicker.googleapis.com/v1/sessions/{sessionId}` until `mediaItemsSet = true`
+  - Fetches `GET https://photospicker.googleapis.com/v1/mediaItems?sessionId={sessionId}` to collect selected items
+  - Deletes session after use (`DELETE https://photospicker.googleapis.com/v1/sessions/{sessionId}`)
+- [ ] `ICurrentUserService` must expose `GetAccessTokenAsync()` — used server-side for the EXIF download request, and client-side for the Picker session token
+
+#### UI
+- [ ] `RoutePhotos.razor` component in `BeenThere.Web/Components/Shared/`:
+  - Horizontal scrollable photo strip (thumbnail cards, ~100×100 px, rounded corners)
+  - Each card: thumbnail image + delete button (owner only) + camera icon if GPS present
+  - "Add photos" button (owner only) — opens Picker, POSTs selected items to API, refreshes strip
+  - Empty state: "No photos yet — add proof you were here" with camera icon
+- [ ] Add photo pin markers to `map-interop.js`:
+  - `addPhotoMarkers(elementId, photos)` — `photos` is `[{ lat, lon, thumbnailUrl }]` (GPS-only items)
+  - Camera icon `L.divIcon` marker; clicking opens a small popup with the thumbnail
+  - `clearPhotoMarkers(elementId)` — removes all photo markers
+- [ ] Wire `RoutePhotos` component into `RouteDetail.razor` below the elevation profile
+- [ ] Call `addPhotoMarkers` from `RouteDetail.razor` after photos load (if map is present on detail page) or from `MapComponent` on the main routes page
+- [ ] Add `camera` and `image` icons to `Icon.razor`
+
+### Done when
+Owner opens a route detail, clicks "Add photos", picks one or more photos from Google Photos Picker, and sees thumbnails in a photo strip. Photos with GPS show as camera-icon pins on the Leaflet map. Owner can delete individual photos.
+
+---
+
+## Milestone 9 — Duplicate detection
 
 **Goal:** background job flags likely duplicates for each newly imported route.
 
@@ -251,7 +330,7 @@ User types "Fontainebleau" + selects 25 km and the library shows only routes who
 
 ---
 
-## Milestone 8 — Dockerfile, production Compose, and CI
+## Milestone 10 — Dockerfile, production Compose, and CI
 
 **Goal:** app is containerised and a GitHub Actions workflow builds and publishes the image.
 
